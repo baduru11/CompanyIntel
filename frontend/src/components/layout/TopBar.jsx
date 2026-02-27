@@ -10,7 +10,7 @@ import { cn } from "../../lib/utils";
  * mode toggle (Explore / Deep Dive), and submit button.
  * Bloomberg-style — data-focused, not chatbot-like.
  */
-export default function TopBar({ onSubmit, isLoading = false }) {
+export default function TopBar({ onSubmit, isLoading = false, onLogoClick }) {
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState("explore");
 
@@ -26,15 +26,19 @@ export default function TopBar({ onSubmit, isLoading = false }) {
 
   return (
     <header className="flex items-center gap-4 px-4 py-2 bg-[hsl(var(--card))] border-b border-[hsl(var(--border))]">
-      {/* Logo */}
-      <div className="flex items-center gap-2 shrink-0">
+      {/* Logo — click to return to history */}
+      <button
+        type="button"
+        onClick={onLogoClick}
+        className="flex items-center gap-2 shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+      >
         <div className="w-7 h-7 rounded bg-[hsl(217,91%,60%)] flex items-center justify-center">
           <span className="text-white text-xs font-bold">CI</span>
         </div>
         <span className="text-sm font-semibold text-[hsl(var(--foreground))] tracking-tight hidden sm:inline">
           CompanyIntel
         </span>
-      </div>
+      </button>
 
       {/* Search form */}
       <form
