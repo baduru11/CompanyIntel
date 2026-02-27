@@ -1,0 +1,224 @@
+{
+  "report": {
+    "query": "digital health SaaS",
+    "sector": "Digital Health SaaS",
+    "companies": [
+      {
+        "name": "Veeva Systems",
+        "sub_sector": "Life Sciences Cloud",
+        "funding_total": "Public (IPO 2013)",
+        "funding_numeric": 0,
+        "founding_year": 2007,
+        "description": "Veeva Systems is the leading cloud software provider for the global life sciences industry. Its platform includes Veeva CRM, Vault (content management), and regulatory compliance solutions used by most major pharmaceutical companies. The company transitioned from Salesforce to its own platform and generates over $2B in annual revenue.",
+        "confidence": 0.95,
+        "source_count": 6
+      },
+      {
+        "name": "Teladoc Health",
+        "sub_sector": "Telehealth Platform",
+        "funding_total": "Public (IPO 2015)",
+        "funding_numeric": 0,
+        "founding_year": 2002,
+        "description": "Teladoc Health is the largest publicly traded telehealth company, providing virtual healthcare delivery across primary care, mental health, and chronic condition management. The company merged with Livongo Health in 2020 for $18.5B, gaining its chronic condition management AI platform. Annual revenue exceeds $2.5B.",
+        "confidence": 0.94,
+        "source_count": 5
+      },
+      {
+        "name": "Hims & Hers Health",
+        "sub_sector": "DTC Telehealth",
+        "funding_total": "Public (IPO via SPAC 2021)",
+        "funding_numeric": 0,
+        "founding_year": 2017,
+        "description": "Hims & Hers is a direct-to-consumer telehealth platform offering online consultations and prescription delivery for dermatology, sexual health, mental health, and weight management. The company has grown rapidly, with revenue exceeding $1.2B in 2024, driven by its GLP-1 weight loss offerings.",
+        "confidence": 0.91,
+        "source_count": 5
+      },
+      {
+        "name": "Amwell",
+        "sub_sector": "Telehealth Infrastructure",
+        "funding_total": "Public (IPO 2020)",
+        "funding_numeric": 0,
+        "founding_year": 2006,
+        "description": "Amwell (American Well) provides a telehealth platform that enables healthcare providers, insurers, and employers to deliver virtual care. The Converge platform integrates telehealth into existing clinical workflows. Google invested $100M in the company during its 2020 IPO.",
+        "confidence": 0.88,
+        "source_count": 4
+      },
+      {
+        "name": "Noom",
+        "sub_sector": "Digital Therapeutics / Weight Management",
+        "funding_total": "$680M",
+        "funding_numeric": 680,
+        "founding_year": 2008,
+        "description": "Noom is a behavior-change platform focused on weight management and chronic disease prevention using cognitive behavioral therapy (CBT) principles delivered through a mobile app. The company combines AI-powered coaching with human health coaches. Noom reached a $3.7B valuation at its peak.",
+        "confidence": 0.85,
+        "source_count": 4
+      },
+      {
+        "name": "Ro Health",
+        "sub_sector": "DTC Telehealth",
+        "funding_total": "$876M",
+        "funding_numeric": 876,
+        "founding_year": 2017,
+        "description": "Ro is a direct-to-consumer telehealth company operating platforms including Roman (men's health), Rory (women's health), and Zero (smoking cessation). The company vertically integrates telehealth visits with an in-house pharmacy and diagnostics lab. Valued at $7B during its 2021 funding round.",
+        "confidence": 0.84,
+        "source_count": 4
+      },
+      {
+        "name": "Lyra Health",
+        "sub_sector": "Mental Health",
+        "funding_total": "$910M",
+        "funding_numeric": 910,
+        "founding_year": 2015,
+        "description": "Lyra Health provides employer-sponsored mental health benefits through a platform that matches employees with therapists and coaches, offering video sessions, self-guided programs, and medication management. The company serves over 15 million members through employer partnerships with companies like Starbucks, eBay, and Morgan Stanley.",
+        "confidence": 0.86,
+        "source_count": 4
+      },
+      {
+        "name": "Spring Health",
+        "sub_sector": "Mental Health",
+        "funding_total": "$460M",
+        "funding_numeric": 460,
+        "founding_year": 2016,
+        "description": "Spring Health is an AI-powered mental health benefits platform for employers. Its Precision Mental Healthcare engine uses machine learning to recommend the most effective treatment path for each individual. The company claims to resolve mental health conditions 2x faster than traditional care. Backed by Tiger Global and Kinnevik.",
+        "confidence": 0.83,
+        "source_count": 3
+      },
+      {
+        "name": "Headspace",
+        "sub_sector": "Mental Wellness",
+        "funding_total": "$430M (pre-merger)",
+        "funding_numeric": 430,
+        "founding_year": 2010,
+        "description": "Headspace is a digital mental wellness platform offering guided meditation, mindfulness exercises, sleep content, and focus tools. The company merged with Ginger (on-demand mental health) in 2021 to form Headspace Health, later rebranding back to Headspace. The combined entity serves both consumers and enterprise clients.",
+        "confidence": 0.84,
+        "source_count": 4
+      },
+      {
+        "name": "Calm",
+        "sub_sector": "Mental Wellness",
+        "funding_total": "$325M",
+        "funding_numeric": 325,
+        "founding_year": 2012,
+        "description": "Calm is a leading mental wellness app offering meditation, sleep stories (narrated by celebrities like Matthew McConaughey), relaxation music, and breathing exercises. The company expanded into B2B with Calm Business for employer wellness programs and Calm Health for clinical applications. Valued at $2B.",
+        "confidence": 0.83,
+        "source_count": 4
+      },
+      {
+        "name": "Cerebral",
+        "sub_sector": "Online Psychiatry",
+        "funding_total": "$462M",
+        "funding_numeric": 462,
+        "founding_year": 2020,
+        "description": "Cerebral is an online mental health company providing therapy, psychiatry, and medication management via a subscription model. The company grew explosively during COVID-19 but faced regulatory scrutiny over prescribing practices for controlled substances. Leadership changes and restructuring followed in 2022-2023.",
+        "confidence": 0.79,
+        "source_count": 4
+      },
+      {
+        "name": "Sword Health",
+        "sub_sector": "Digital Physical Therapy",
+        "funding_total": "$340M",
+        "funding_numeric": 340,
+        "founding_year": 2015,
+        "description": "Sword Health provides AI-powered digital musculoskeletal (MSK) care through a platform that combines computer vision, motion sensors, and human physical therapists. Patients use a tablet and wearable sensors at home for guided exercise sessions. The company serves over 2,500 employer and health plan clients.",
+        "confidence": 0.82,
+        "source_count": 3
+      },
+      {
+        "name": "Omada Health",
+        "sub_sector": "Chronic Disease Management",
+        "funding_total": "$500M",
+        "funding_numeric": 500,
+        "founding_year": 2011,
+        "description": "Omada Health is a digital care platform for chronic disease prevention and management, covering diabetes, hypertension, musculoskeletal conditions, and behavioral health. The company uses connected devices, data science, and human coaching to drive behavior change. Serves over 1,800 enterprise clients.",
+        "confidence": 0.84,
+        "source_count": 4
+      },
+      {
+        "name": "Thirty Madison",
+        "sub_sector": "DTC Specialty Care",
+        "funding_total": "$240M",
+        "funding_numeric": 240,
+        "founding_year": 2017,
+        "description": "Thirty Madison operates a family of direct-to-consumer healthcare brands targeting specific conditions: Keeps (hair loss), Cove (migraine), Evens (heartburn), and Picnic (allergies). Each brand combines telehealth consultations with prescription delivery, offering a vertically integrated patient experience.",
+        "confidence": 0.78,
+        "source_count": 3
+      },
+      {
+        "name": "Truepill",
+        "sub_sector": "Digital Pharmacy Infrastructure",
+        "funding_total": "$256M",
+        "funding_numeric": 256,
+        "founding_year": 2016,
+        "description": "Truepill provides pharmacy-as-a-service infrastructure for digital health companies, handling fulfillment, telehealth, and diagnostics through APIs. The company powers the pharmacy backend for many DTC telehealth brands. Rebranded some services under Docent Health. Backed by SoftBank and Vibe Capital.",
+        "confidence": 0.77,
+        "source_count": 3
+      }
+    ],
+    "sub_sectors": [
+      "Life Sciences Cloud",
+      "Telehealth Platform",
+      "DTC Telehealth",
+      "Telehealth Infrastructure",
+      "Digital Therapeutics / Weight Management",
+      "Mental Health",
+      "Mental Wellness",
+      "Online Psychiatry",
+      "Digital Physical Therapy",
+      "Chronic Disease Management",
+      "DTC Specialty Care",
+      "Digital Pharmacy Infrastructure"
+    ],
+    "summary": "The digital health SaaS sector experienced explosive growth during the COVID-19 pandemic, with telehealth adoption accelerating by a decade in just months. The landscape spans multiple sub-sectors including telehealth platforms (Teladoc, Amwell), DTC healthcare brands (Hims & Hers, Ro, Thirty Madison), mental health platforms (Lyra Health, Spring Health, Headspace, Calm), chronic disease management (Omada, Noom), and enabling infrastructure (Veeva, Truepill). Total venture funding to private digital health companies exceeds $5B among the top players alone. Key trends include the rise of GLP-1/weight management platforms, employer-sponsored mental health benefits, AI-powered treatment matching, and vertical integration of telehealth with pharmacy fulfillment. The sector faces headwinds from regulatory scrutiny (particularly around controlled substance prescribing), post-pandemic normalization of virtual care utilization, and pressure to demonstrate clinical outcomes and ROI to employer customers. Public company valuations have compressed significantly from 2021 peaks, while later-stage private companies face down-round risk."
+  },
+  "critic": {
+    "overall_confidence": 0.80,
+    "section_scores": {
+      "companies": 0.83,
+      "sub_sectors": 0.87,
+      "summary": 0.78,
+      "funding_data": 0.74,
+      "founding_years": 0.89
+    },
+    "verifications": [
+      {
+        "field": "Veeva Systems founding_year",
+        "status": "verified",
+        "source_url": "https://www.veeva.com/about/",
+        "note": "Founded 2007 by Peter Gassner"
+      },
+      {
+        "field": "Teladoc Livongo merger",
+        "status": "verified",
+        "source_url": "https://www.teladochealth.com/",
+        "note": "Merger closed October 2020 in an $18.5B deal"
+      },
+      {
+        "field": "Lyra Health funding_total",
+        "status": "verified",
+        "source_url": "https://www.crunchbase.com/organization/lyra-health",
+        "note": "Total funding approximately $910M through Series F"
+      },
+      {
+        "field": "Cerebral regulatory issues",
+        "status": "verified",
+        "source_url": "https://www.doj.gov/",
+        "note": "DOJ and DEA investigations into prescribing practices confirmed"
+      },
+      {
+        "field": "Hims & Hers revenue",
+        "status": "unverified",
+        "source_url": null,
+        "note": "2024 revenue figure of $1.2B+ is based on analyst estimates and may vary by reporting period"
+      }
+    ],
+    "gaps": [
+      "Noom's current valuation may differ from its $3.7B peak given market corrections",
+      "Cerebral's current operational status and subscriber count need verification",
+      "Headspace/Ginger merger entity structure and current branding may have evolved",
+      "Truepill rebranding details are incomplete",
+      "Several companies may have undergone layoffs or restructuring not captured here"
+    ],
+    "should_retry": false,
+    "retry_queries": []
+  }
+}

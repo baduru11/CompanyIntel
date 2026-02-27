@@ -1,0 +1,275 @@
+{
+  "report": {
+    "query": "Recursion Pharmaceuticals",
+    "company_name": "Recursion Pharmaceuticals",
+    "overview": {
+      "title": "Overview",
+      "content": "Recursion Pharmaceuticals (NASDAQ: RXRX) is a clinical-stage biotechnology company that combines artificial intelligence, machine learning, and automation to industrialize drug discovery. Founded in 2013 and headquartered in Salt Lake City, Utah, the company has built one of the world's largest proprietary biological and chemical datasets.\n\nRecursion's platform, called Recursion OS, integrates automated wet-lab biology (high-throughput cellular imaging), large-scale compute, and advanced machine learning models to map cellular biology at scale. The company generates massive datasets by perturbing human cells with genetic knockdowns, chemical compounds, and other interventions, then imaging them with automated microscopy. The resulting dataset — comprising trillions of data points — enables AI models to identify novel drug targets and therapeutic candidates.\n\nThe company went public in April 2021 through an IPO on NASDAQ. Recursion has expanded its platform through strategic acquisitions and partnerships, most notably a major collaboration with Roche and Genentech. As of early 2025, Recursion has multiple programs in clinical trials and a broad preclinical pipeline spanning oncology, rare diseases, and infectious diseases.\n\nRecursion employs approximately 600-700 people and operates automated biology labs in Salt Lake City and Toronto (via its acquisition of Cyclica).",
+      "confidence": 0.91,
+      "source_urls": [
+        "https://www.recursion.com/",
+        "https://ir.recursion.com/",
+        "https://en.wikipedia.org/wiki/Recursion_Pharmaceuticals",
+        "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001601830"
+      ],
+      "source_count": 4
+    },
+    "funding": {
+      "title": "Funding History",
+      "content": "Recursion Pharmaceuticals has raised substantial capital through both private funding rounds and its public listing.\n\nPrior to its IPO, Recursion raised approximately $450M across multiple private rounds. Key pre-IPO investors included Baillie Gifford, DCVC (Data Collective), Lux Capital, Leaps by Bayer, and Casdin Capital.\n\nIn April 2021, Recursion completed its IPO on NASDAQ, raising approximately $436M at $18 per share. The stock reached a high of over $40 in the months following the IPO but subsequently declined amid the broader biotech downturn.\n\nIn December 2023, Recursion announced a landmark collaboration with Roche and Genentech worth up to $150M upfront, with potential milestone payments. As part of this deal, Roche made an equity investment in Recursion.\n\nIn 2023, Recursion acquired three companies to expand its platform capabilities: Cyclica (computational chemistry), Valence Discovery (generative chemistry AI), and a dataset from the Broad Institute. These acquisitions, primarily stock-based, bolstered Recursion's ability to design novel molecules.\n\nThe company has also raised additional capital through follow-on public offerings to fund its expanding pipeline and platform investments. Total capital raised (private + public) exceeds $1B.",
+      "confidence": 0.83,
+      "source_urls": [
+        "https://ir.recursion.com/",
+        "https://www.crunchbase.com/organization/recursion-pharmaceuticals",
+        "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001601830",
+        "https://www.reuters.com/business/healthcare-pharmaceuticals/"
+      ],
+      "source_count": 4
+    },
+    "funding_rounds": [
+      {
+        "date": "2016-06",
+        "stage": "Series A",
+        "amount": "$15M",
+        "investors": ["Lux Capital", "DCVC", "Obvious Ventures"],
+        "source_url": "https://www.crunchbase.com/organization/recursion-pharmaceuticals"
+      },
+      {
+        "date": "2017-10",
+        "stage": "Series B",
+        "amount": "$60M",
+        "investors": ["DCVC", "Lux Capital", "Leaps by Bayer"],
+        "source_url": "https://www.crunchbase.com/organization/recursion-pharmaceuticals"
+      },
+      {
+        "date": "2019-07",
+        "stage": "Series C",
+        "amount": "$121M",
+        "investors": ["Casdin Capital", "Baillie Gifford", "DCVC", "Lux Capital", "Leaps by Bayer"],
+        "source_url": "https://www.crunchbase.com/organization/recursion-pharmaceuticals"
+      },
+      {
+        "date": "2020-09",
+        "stage": "Series D",
+        "amount": "$239M",
+        "investors": ["Baillie Gifford", "Casdin Capital", "DCVC", "Lux Capital"],
+        "source_url": "https://www.crunchbase.com/organization/recursion-pharmaceuticals"
+      },
+      {
+        "date": "2021-04",
+        "stage": "IPO",
+        "amount": "$436M",
+        "investors": ["Public"],
+        "source_url": "https://ir.recursion.com/"
+      },
+      {
+        "date": "2023-12",
+        "stage": "Strategic Partnership",
+        "amount": "$150M upfront (Roche/Genentech)",
+        "investors": ["Roche", "Genentech"],
+        "source_url": "https://ir.recursion.com/"
+      }
+    ],
+    "key_people": {
+      "title": "Key People",
+      "content": "Chris Gibson, PhD (Co-Founder & CEO) — Chris Gibson co-founded Recursion in 2013 while completing his PhD in genetics and epidemiology at the University of Utah. His research on repurposing existing drugs using cellular imaging led to the founding insight behind Recursion's platform. Gibson has led the company from a small academic spinout to a publicly traded biotech with a multi-billion-dollar platform.\n\nTrent Northen, PhD (Co-Founder) — Northen is a co-founder of Recursion and contributed to the early scientific foundations of the company.\n\nDean Li, MD, PhD (Co-Founder) — Li is a cardiologist and scientist who co-founded Recursion. He subsequently left to become the President of Merck Research Laboratories at Merck & Co.\n\nBen Mabey (VP of Data Science) — Mabey has been instrumental in building Recursion's machine learning infrastructure and data science capabilities.\n\nHeather Kirkby, PhD (Chief Operating Officer) — Kirkby oversees Recursion's operations including the automated biology laboratories and manufacturing partnerships.\n\nKatherine Bock, PhD (Chief Financial Officer) — Bock joined Recursion to lead financial strategy, investor relations, and capital allocation as the company scales its clinical pipeline.\n\nMike Secora (Chief Technology Officer) — Secora leads the engineering and compute infrastructure that powers Recursion OS.",
+      "confidence": 0.84,
+      "source_urls": [
+        "https://www.recursion.com/team",
+        "https://ir.recursion.com/",
+        "https://www.linkedin.com/company/recursion-pharmaceuticals/"
+      ],
+      "source_count": 3
+    },
+    "product_technology": {
+      "title": "Product/Technology",
+      "content": "Recursion's core asset is its Recursion OS platform, which integrates automated biology, large-scale computation, and AI/ML to accelerate drug discovery.\n\n**Automated Biology (Wet Lab):**\n- High-throughput automated labs in Salt Lake City process millions of experiments per week.\n- Automated cellular imaging captures phenotypic responses to genetic and chemical perturbations.\n- The company has generated one of the largest proprietary biological datasets in the world, comprising petabytes of cellular images.\n- Cells are perturbed using CRISPR gene knockdowns, small molecules, and other interventions, then imaged with automated fluorescence microscopy.\n\n**Recursion OS (Software/AI Platform):**\n- The platform ingests and processes massive biological datasets to build \"maps of biology\" that reveal relationships between genes, pathways, and diseases.\n- Machine learning models trained on this data can predict novel drug targets and identify therapeutic candidates.\n- The MatchMaker AI tool identifies potential drug-target interactions from the biological dataset.\n- Generative chemistry models (enhanced by the Valence Discovery acquisition) design novel molecules optimized for target activity, selectivity, and drug-like properties.\n- LOWE (Large Language Model for Omics and Wet-lab Experiments) — Recursion's foundation model trained on biological data.\n\n**Clinical Pipeline:**\n- REC-4881 (Phase 2): Oral MEK inhibitor for familial adenomatous polyposis (FAP), a genetic condition that predisposes to colorectal cancer. Originally discovered by Recursion's platform as a repurposed compound.\n- REC-994 (Phase 2): Cerebral cavernous malformations (CCM), a rare vascular disease with no approved treatments.\n- REC-3964 (Phase 1): Antiviral targeting C. difficile infections.\n- Multiple additional preclinical programs in oncology and rare diseases.\n\n**Roche/Genentech Partnership:**\n- A multi-year collaboration leveraging Recursion OS for up to 40 programs across oncology and neuroscience.\n- Roche gained access to Recursion's platform for target identification and drug candidate generation.\n- The deal includes $150M upfront and potential milestone payments.\n\n**Compute Infrastructure:**\n- Recursion operates one of the largest supercomputers in the pharmaceutical industry, powered by NVIDIA GPUs, to train its AI models on biological data.",
+      "confidence": 0.89,
+      "source_urls": [
+        "https://www.recursion.com/technology",
+        "https://www.recursion.com/pipeline",
+        "https://ir.recursion.com/",
+        "https://clinicaltrials.gov/",
+        "https://www.recursion.com/news"
+      ],
+      "source_count": 5
+    },
+    "recent_news": {
+      "title": "Recent News",
+      "content": "Recursion has been active with partnerships, clinical progress, and platform expansion:\n\n- In December 2023, Recursion announced a landmark partnership with Roche and Genentech, including $150M upfront and Roche equity investment. This deal validated Recursion's AI-driven drug discovery platform at the highest level of the pharmaceutical industry.\n- Throughout 2023, Recursion completed three acquisitions: Cyclica (Toronto-based computational chemistry), Valence Discovery (Montreal-based generative chemistry AI), and a dataset from the Broad Institute. These expanded the platform from target discovery into molecular design.\n- Recursion's REC-4881 (MEK inhibitor for familial adenomatous polyposis) showed encouraging Phase 2 results, demonstrating clinically meaningful polyp regression.\n- The company launched LOWE, a foundation model for biological data, positioning Recursion at the intersection of AI/ML and drug discovery.\n- Recursion expanded its partnership with NVIDIA to leverage advanced GPU computing for training larger biological AI models.\n- The stock (RXRX) experienced significant volatility, reflecting both excitement around AI-driven drug discovery and broader biotech market headwinds. The company's market cap has fluctuated between approximately $1.5B and $4B.\n- Recursion was added to the Russell 2000 index, increasing institutional investor visibility.",
+      "confidence": 0.82,
+      "source_urls": [
+        "https://ir.recursion.com/news-events",
+        "https://www.recursion.com/news",
+        "https://clinicaltrials.gov/",
+        "https://www.reuters.com/business/healthcare-pharmaceuticals/"
+      ],
+      "source_count": 4
+    },
+    "news_items": [
+      {
+        "title": "Recursion and Roche/Genentech announce $150M+ partnership",
+        "date": "2023-12",
+        "source_url": "https://ir.recursion.com/news-events",
+        "snippet": "Recursion entered a multi-year collaboration with Roche and Genentech to leverage its AI-driven platform for drug discovery across oncology and neuroscience, with $150M upfront and potential milestones.",
+        "sentiment": "positive"
+      },
+      {
+        "title": "Recursion acquires Cyclica and Valence Discovery",
+        "date": "2023-05",
+        "source_url": "https://www.recursion.com/news",
+        "snippet": "Recursion expanded its AI drug discovery platform through acquisitions of Cyclica (computational chemistry) and Valence Discovery (generative chemistry), enabling end-to-end molecule design capabilities.",
+        "sentiment": "positive"
+      },
+      {
+        "title": "REC-4881 Phase 2 shows polyp regression in FAP patients",
+        "date": "2024-06",
+        "source_url": "https://ir.recursion.com/news-events",
+        "snippet": "Recursion reported positive interim Phase 2 data for REC-4881 in familial adenomatous polyposis (FAP), showing clinically meaningful polyp burden reduction with a manageable safety profile.",
+        "sentiment": "positive"
+      },
+      {
+        "title": "Recursion launches LOWE biological foundation model",
+        "date": "2024-03",
+        "source_url": "https://www.recursion.com/news",
+        "snippet": "Recursion unveiled LOWE, a large foundation model trained on its proprietary biological dataset, designed to predict gene function and drug-target interactions across disease areas.",
+        "sentiment": "positive"
+      },
+      {
+        "title": "RXRX stock volatility amid biotech downturn",
+        "date": "2024-08",
+        "source_url": "https://www.reuters.com/business/healthcare-pharmaceuticals/",
+        "snippet": "Recursion shares experienced significant price swings as investors debated the timeline for AI-driven drug discovery to translate into approved therapies, amid broader biotech sector weakness.",
+        "sentiment": "negative"
+      },
+      {
+        "title": "Recursion expands NVIDIA GPU partnership for AI drug discovery",
+        "date": "2024-01",
+        "source_url": "https://www.recursion.com/news",
+        "snippet": "Recursion deepened its collaboration with NVIDIA, leveraging BioNeMo and advanced GPU computing to accelerate training of biological AI models on its multi-petabyte proprietary dataset.",
+        "sentiment": "positive"
+      }
+    ],
+    "competitors": {
+      "title": "Competitors",
+      "content": "Recursion competes in the AI-driven drug discovery space, which has attracted significant investment and a growing number of players.\n\n**AI-Native Drug Discovery Companies:** Insitro (founded by Daphne Koller, backed by a16z), Exscientia (UK-based, NASDAQ-listed, acquired by Recursion competitor), AbCellera (antibody discovery), Relay Therapeutics (structure-based drug design), Insilico Medicine (generative AI for drug design, based in Hong Kong). Each takes a different approach to applying AI to drug discovery.\n\n**Tech-Pharma Hybrids:** Isomorphic Labs (Google DeepMind spinout focused on AlphaFold-based drug discovery), Xaira Therapeutics (founded 2024 with $1B from Foresite Labs), and various pharma company internal AI programs.\n\n**Traditional Pharma with AI Capabilities:** Major pharmaceutical companies (Roche, Pfizer, Novartis, AstraZeneca) are building internal AI drug discovery capabilities and partnering with AI-native companies like Recursion.\n\n**Key Differentiators for Recursion:** Recursion is differentiated by: (1) its massive proprietary biological dataset generated through automated wet-lab experiments (most competitors rely on public data or smaller datasets), (2) full vertical integration from target discovery through molecule design, (3) the Roche/Genentech partnership validating the platform, and (4) clinical-stage programs demonstrating the pipeline can advance to human trials.",
+      "confidence": 0.85,
+      "source_urls": [
+        "https://www.insitro.com/",
+        "https://www.exscientia.ai/",
+        "https://www.relaytherap.com/",
+        "https://insilico.com/",
+        "https://www.isomorphiclabs.com/"
+      ],
+      "source_count": 5
+    },
+    "competitor_entries": [
+      {
+        "name": "Insitro",
+        "description": "Founded by Stanford professor Daphne Koller, insitro uses machine learning on biological data (including iPSC-derived cellular models) to identify drug targets and design therapeutics. Focused on metabolic disease and neuroscience.",
+        "funding": "$743M (Private)",
+        "differentiator": "iPSC-derived disease models generating patient-relevant biological data; strong academic and pharma partnerships"
+      },
+      {
+        "name": "Exscientia",
+        "description": "UK-based AI drug discovery company that designs small molecules using AI and automation. Has multiple pharma partnerships and clinical-stage programs. Listed on NASDAQ.",
+        "funding": "Public (NASDAQ: EXAI)",
+        "differentiator": "Active learning approach to molecular design; has advanced multiple AI-designed molecules to clinical trials"
+      },
+      {
+        "name": "Relay Therapeutics",
+        "description": "Uses computational approaches including molecular dynamics simulations to understand protein motion and design precision medicines. Focused on oncology.",
+        "funding": "Public (NASDAQ: RLAY)",
+        "differentiator": "Motion-based drug discovery using molecular dynamics; clinical-stage PI3K-alpha inhibitor (RLY-4008/lirafugratinib)"
+      },
+      {
+        "name": "Insilico Medicine",
+        "description": "Hong Kong-based AI drug discovery company using generative AI to design novel molecules and identify targets. Has advanced AI-discovered drug candidates to Phase 2 clinical trials.",
+        "funding": "$400M+ (Private)",
+        "differentiator": "First company to bring a fully AI-discovered drug to Phase 2; end-to-end generative AI from target to molecule"
+      },
+      {
+        "name": "Isomorphic Labs",
+        "description": "Spun out of Google DeepMind in 2021, Isomorphic Labs applies AlphaFold and related protein structure prediction technology to drug discovery. Led by DeepMind CEO Demis Hassabi.",
+        "funding": "Backed by Alphabet (undisclosed)",
+        "differentiator": "AlphaFold protein structure prediction; DeepMind's AI research capabilities; Alphabet's compute resources"
+      },
+      {
+        "name": "Xaira Therapeutics",
+        "description": "Founded in 2024 by Foresite Labs with $1B in funding, Xaira focuses on using AI for protein engineering and drug design, led by former Amgen executive.",
+        "funding": "$1B (launched 2024)",
+        "differentiator": "Largest initial funding in AI drug discovery history; extensive protein engineering capabilities from Foresite Labs"
+      }
+    ],
+    "red_flags": {
+      "title": "Red Flags",
+      "content": "Investors and analysts should consider several risk factors:\n\n1. **Clinical Translation Risk**: Despite impressive AI capabilities, Recursion has not yet produced an FDA-approved drug. The critical question is whether AI-discovered drug candidates will succeed in clinical trials at higher rates than traditionally discovered drugs. Clinical failure is always possible regardless of how the target was identified.\n\n2. **Revenue Concentration and Cash Burn**: Recursion generates minimal product revenue and relies heavily on partnership income (e.g., Roche deal) and capital markets to fund operations. The company reported significant operating losses, burning through approximately $80-100M per quarter. Cash runway is a constant concern.\n\n3. **Platform Validation Timeline**: While the Roche partnership is a strong validation signal, it may take 5-10 years before partnered programs yield approved drugs and royalty revenue. Investors need patience for the AI drug discovery thesis to fully play out.\n\n4. **Stock Volatility and Dilution**: RXRX has been highly volatile, and the company has conducted follow-on offerings and used stock for acquisitions, diluting existing shareholders. Further dilution is likely to fund ongoing operations.\n\n5. **Competitive Intensity**: The AI drug discovery space is becoming crowded, with well-funded competitors (Insitro, Isomorphic Labs, Xaira) and pharma companies building internal capabilities. Recursion's data moat could narrow as competitors scale their own datasets.\n\n6. **Key Person Dependency**: CEO Chris Gibson is central to the company's vision and investor narrative. His departure would be material.\n\n7. **Acquisition Integration**: The rapid acquisitions of Cyclica, Valence Discovery, and the Broad Institute dataset require successful technical and cultural integration. Acquisition risk is always present.\n\n8. **Regulatory and Reimbursement Risk**: Even if drugs are approved, reimbursement and market access for AI-discovered drugs face the same challenges as any pharmaceutical product, with no guaranteed pricing advantage.",
+      "confidence": 0.80,
+      "source_urls": [
+        "https://ir.recursion.com/",
+        "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001601830",
+        "https://clinicaltrials.gov/"
+      ],
+      "source_count": 3
+    }
+  },
+  "critic": {
+    "overall_confidence": 0.83,
+    "section_scores": {
+      "overview": 0.91,
+      "funding": 0.83,
+      "key_people": 0.84,
+      "product_technology": 0.89,
+      "recent_news": 0.82,
+      "competitors": 0.85,
+      "red_flags": 0.80
+    },
+    "verifications": [
+      {
+        "field": "founding_year",
+        "status": "verified",
+        "source_url": "https://www.recursion.com/",
+        "note": "Founded 2013 in Salt Lake City, Utah"
+      },
+      {
+        "field": "CEO",
+        "status": "verified",
+        "source_url": "https://www.recursion.com/team",
+        "note": "Chris Gibson, PhD — co-founder and CEO"
+      },
+      {
+        "field": "IPO details",
+        "status": "verified",
+        "source_url": "https://ir.recursion.com/",
+        "note": "IPO in April 2021 on NASDAQ, ticker RXRX"
+      },
+      {
+        "field": "Roche partnership",
+        "status": "verified",
+        "source_url": "https://ir.recursion.com/news-events",
+        "note": "$150M upfront collaboration announced December 2023"
+      },
+      {
+        "field": "Dean Li at Merck",
+        "status": "verified",
+        "source_url": "https://www.merck.com/",
+        "note": "Dean Li became President of Merck Research Laboratories"
+      },
+      {
+        "field": "REC-4881 Phase 2 data",
+        "status": "unverified",
+        "source_url": null,
+        "note": "Interim data reported but final Phase 2 results pending; efficacy characterization ongoing"
+      }
+    ],
+    "gaps": [
+      "Exact current cash position and quarterly burn rate should be verified against latest SEC filings",
+      "Some executive titles and roles may have changed — verify against current leadership page",
+      "Details on Broad Institute dataset acquisition terms are limited",
+      "Specific pipeline program timelines and next data readouts need verification",
+      "Current headcount is approximate and the company has been adjusting staffing levels"
+    ],
+    "should_retry": false,
+    "retry_queries": []
+  }
+}

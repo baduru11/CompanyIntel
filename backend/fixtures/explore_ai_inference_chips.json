@@ -1,0 +1,224 @@
+{
+  "report": {
+    "query": "AI inference chips",
+    "sector": "AI Inference Hardware",
+    "companies": [
+      {
+        "name": "NVIDIA",
+        "sub_sector": "GPU",
+        "funding_total": "Public (IPO 1999)",
+        "funding_numeric": 0,
+        "founding_year": 1993,
+        "description": "The dominant force in AI training and inference hardware, NVIDIA designs GPUs and the CUDA software ecosystem that underpin most modern AI workloads. Its data center revenue exceeded $47B in FY2024, driven by H100 and A100 accelerators. The company also offers the TensorRT inference optimization platform.",
+        "confidence": 0.97,
+        "source_count": 8
+      },
+      {
+        "name": "AMD",
+        "sub_sector": "GPU",
+        "funding_total": "Public (IPO 1979)",
+        "funding_numeric": 0,
+        "founding_year": 1969,
+        "description": "AMD competes directly with NVIDIA in AI inference through its Instinct MI300X accelerators and ROCm software stack. After acquiring Xilinx in 2022 for $49B, AMD also offers FPGA-based inference solutions. The company is aggressively targeting the data center AI market.",
+        "confidence": 0.95,
+        "source_count": 6
+      },
+      {
+        "name": "Intel",
+        "sub_sector": "GPU / ASIC",
+        "funding_total": "Public (IPO 1971)",
+        "funding_numeric": 0,
+        "founding_year": 1968,
+        "description": "Intel competes in AI inference through its Gaudi accelerators (via the 2019 Habana Labs acquisition), its Xeon CPUs with built-in AI acceleration, and its discrete Arc GPUs. The company is investing heavily in AI silicon to recapture market share from NVIDIA.",
+        "confidence": 0.92,
+        "source_count": 5
+      },
+      {
+        "name": "Cerebras Systems",
+        "sub_sector": "Wafer-Scale Processing",
+        "funding_total": "$720M",
+        "funding_numeric": 720,
+        "founding_year": 2016,
+        "description": "Cerebras builds the world's largest chip, the Wafer Scale Engine (WSE-3), which contains 4 trillion transistors on a single wafer. Designed for both training and inference, the WSE architecture eliminates memory bandwidth bottlenecks. Backed by investors including Eclipse Ventures and Altimeter Capital.",
+        "confidence": 0.88,
+        "source_count": 4
+      },
+      {
+        "name": "Groq",
+        "sub_sector": "ASIC",
+        "funding_total": "$682M",
+        "funding_numeric": 682,
+        "founding_year": 2016,
+        "description": "Groq developed the Language Processing Unit (LPU), an ASIC optimized for ultra-fast AI inference. The company's GroqCloud platform demonstrates dramatically faster token generation for large language models compared to GPU-based solutions. Founded by former Google TPU engineer Jonathan Ross.",
+        "confidence": 0.87,
+        "source_count": 5
+      },
+      {
+        "name": "SambaNova Systems",
+        "sub_sector": "Dataflow Architecture",
+        "funding_total": "$1.1B",
+        "funding_numeric": 1100,
+        "founding_year": 2017,
+        "description": "SambaNova developed the SN40L Reconfigurable Dataflow Unit (RDU), a custom chip architecture designed for enterprise AI workloads. The company offers a full-stack AI platform including hardware and software through its SambaNova Suite. Backed by SoftBank, BlackRock, and Intel Capital.",
+        "confidence": 0.85,
+        "source_count": 4
+      },
+      {
+        "name": "Graphcore",
+        "sub_sector": "IPU",
+        "funding_total": "$730M",
+        "funding_numeric": 730,
+        "founding_year": 2016,
+        "description": "UK-based Graphcore designed the Intelligence Processing Unit (IPU), a massively parallel processor for AI workloads. The company's Bow IPU was the first processor to use wafer-on-wafer 3D stacking in production. Graphcore has faced financial difficulties and was reportedly exploring a sale in 2024.",
+        "confidence": 0.80,
+        "source_count": 4
+      },
+      {
+        "name": "Tenstorrent",
+        "sub_sector": "RISC-V AI Processor",
+        "funding_total": "$370M",
+        "funding_numeric": 370,
+        "founding_year": 2016,
+        "description": "Led by legendary chip architect Jim Keller, Tenstorrent builds AI processors based on the open-source RISC-V instruction set. The company's Wormhole and Grayskull chips target both inference and training. Tenstorrent also licenses its IP to other chipmakers, offering a more open alternative to NVIDIA's ecosystem.",
+        "confidence": 0.84,
+        "source_count": 4
+      },
+      {
+        "name": "d-Matrix",
+        "sub_sector": "In-Memory Computing",
+        "funding_total": "$160M",
+        "funding_numeric": 160,
+        "founding_year": 2019,
+        "description": "d-Matrix develops digital in-memory compute (DIMC) chips specifically optimized for AI inference in data centers. The Corsair platform performs compute directly in SRAM, drastically reducing data movement and power consumption for transformer-based models. Backed by Microsoft's M12 and Playground Global.",
+        "confidence": 0.78,
+        "source_count": 3
+      },
+      {
+        "name": "Esperanto Technologies",
+        "sub_sector": "RISC-V AI Processor",
+        "funding_total": "$97M",
+        "funding_numeric": 97,
+        "founding_year": 2014,
+        "description": "Esperanto Technologies builds massively multi-core RISC-V processors for energy-efficient AI inference. The ET-SoC-1 chip contains over 1,000 RISC-V cores optimized for ML workloads. The company targets cloud inference where performance-per-watt is critical.",
+        "confidence": 0.75,
+        "source_count": 3
+      },
+      {
+        "name": "Hailo",
+        "sub_sector": "Edge AI ASIC",
+        "funding_total": "$340M",
+        "funding_numeric": 340,
+        "founding_year": 2017,
+        "description": "Israeli startup Hailo designs AI processors for edge devices, enabling real-time inference in autonomous vehicles, smart cameras, and industrial systems. The Hailo-8 chip delivers up to 26 TOPS while consuming only 2.5 watts. Partnered with major automotive and industrial OEMs.",
+        "confidence": 0.83,
+        "source_count": 4
+      },
+      {
+        "name": "Mythic",
+        "sub_sector": "Analog In-Memory Computing",
+        "funding_total": "$165M",
+        "funding_numeric": 165,
+        "founding_year": 2012,
+        "description": "Mythic pioneered analog compute-in-memory technology for AI inference, storing neural network weights directly in flash memory cells and performing matrix multiplications in the analog domain. The approach promises dramatic power efficiency gains for edge inference applications.",
+        "confidence": 0.72,
+        "source_count": 3
+      },
+      {
+        "name": "Rain AI",
+        "sub_sector": "Neuromorphic",
+        "funding_total": "$67M",
+        "funding_numeric": 67,
+        "founding_year": 2018,
+        "description": "Rain AI is developing brain-inspired neuromorphic processors that aim to deliver 100x better energy efficiency than GPUs for AI inference. The company received a notable investment from Sam Altman. Rain's approach mimics biological neural networks with analog in-memory computing.",
+        "confidence": 0.70,
+        "source_count": 2
+      },
+      {
+        "name": "Untether AI",
+        "sub_sector": "At-Memory Computing",
+        "funding_total": "$165M",
+        "funding_numeric": 165,
+        "founding_year": 2018,
+        "description": "Canadian startup Untether AI builds at-memory computing chips where processing happens directly at the SRAM banks storing AI model weights. The tsunAImi chip is designed for high-throughput, low-latency inference in data centers. The architecture eliminates the von Neumann bottleneck.",
+        "confidence": 0.76,
+        "source_count": 3
+      },
+      {
+        "name": "Blaize",
+        "sub_sector": "Edge AI Graph Processor",
+        "funding_total": "$235M",
+        "funding_numeric": 235,
+        "founding_year": 2010,
+        "description": "Blaize (formerly known as ThinCI) builds graph-native AI processors for edge computing. The El Cano processor and Pathfinder software platform are designed for automotive, retail, and smart-city applications requiring low-power, real-time AI inference at the edge.",
+        "confidence": 0.73,
+        "source_count": 3
+      }
+    ],
+    "sub_sectors": [
+      "GPU",
+      "ASIC",
+      "Wafer-Scale Processing",
+      "Dataflow Architecture",
+      "IPU",
+      "RISC-V AI Processor",
+      "In-Memory Computing",
+      "Edge AI ASIC",
+      "Analog In-Memory Computing",
+      "Neuromorphic",
+      "At-Memory Computing",
+      "Edge AI Graph Processor"
+    ],
+    "summary": "The AI inference chip landscape is a rapidly expanding market driven by the explosive growth of large language models and generative AI. While NVIDIA dominates with over 80% market share in AI accelerators, a diverse ecosystem of challengers is emerging across multiple architectural paradigms. Companies are pursuing GPUs (NVIDIA, AMD), custom ASICs (Groq, Hailo), wafer-scale processors (Cerebras), dataflow architectures (SambaNova), RISC-V based designs (Tenstorrent, Esperanto), and novel in-memory computing approaches (d-Matrix, Mythic, Untether AI). Total venture funding to private AI chip companies exceeds $5B. Key competitive dimensions include raw throughput, latency, power efficiency, software ecosystem maturity, and total cost of ownership. The market is bifurcating between data center inference (dominated by NVIDIA, challenged by Groq and Cerebras) and edge inference (Hailo, Blaize, Mythic). The sector faces consolidation pressure as companies with less differentiated architectures struggle to compete against NVIDIA's entrenched CUDA ecosystem."
+  },
+  "critic": {
+    "overall_confidence": 0.81,
+    "section_scores": {
+      "companies": 0.84,
+      "sub_sectors": 0.88,
+      "summary": 0.79,
+      "funding_data": 0.72,
+      "founding_years": 0.90
+    },
+    "verifications": [
+      {
+        "field": "NVIDIA founding_year",
+        "status": "verified",
+        "source_url": "https://www.nvidia.com/en-us/about-nvidia/",
+        "note": "Founded January 1993 by Jensen Huang, Chris Malachowsky, Curtis Priem"
+      },
+      {
+        "field": "Cerebras funding_total",
+        "status": "verified",
+        "source_url": "https://www.crunchbase.com/organization/cerebras-systems",
+        "note": "Total funding approximately $720M through Series F"
+      },
+      {
+        "field": "Groq founding_year",
+        "status": "verified",
+        "source_url": "https://groq.com/about/",
+        "note": "Founded 2016 by Jonathan Ross, former Google TPU lead"
+      },
+      {
+        "field": "SambaNova funding_total",
+        "status": "verified",
+        "source_url": "https://www.crunchbase.com/organization/sambanova-systems",
+        "note": "Total funding approximately $1.1B including Series D"
+      },
+      {
+        "field": "Graphcore financial status",
+        "status": "unverified",
+        "source_url": null,
+        "note": "Reports of financial difficulties and potential sale are based on press reports; current status uncertain"
+      }
+    ],
+    "gaps": [
+      "Exact current headcount for most private companies is estimated",
+      "Graphcore's current financial status and ownership may have changed",
+      "Some funding totals may not include undisclosed rounds",
+      "Mythic's operational status needs verification — company faced layoffs in 2023",
+      "Rain AI's product timeline and technical progress are not well-documented publicly"
+    ],
+    "should_retry": false,
+    "retry_queries": []
+  }
+}

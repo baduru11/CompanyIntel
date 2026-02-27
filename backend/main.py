@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from pathlib import Path
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException
@@ -24,6 +25,31 @@ from backend.graph import build_deep_dive_graph, build_explore_graph
 from backend.streaming import format_sse
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Fixture loading for offline / demo mode
+# ---------------------------------------------------------------------------
+FIXTURES_DIR = Path(__file__).parent / "fixtures"
+
+FIXTURE_MAP: dict[tuple[str, str], str] = {
+    ("explore", "ai inference chips"): "explore_ai_inference_chips.json",
+    ("explore", "digital health saas"): "explore_digital_health_saas.json",
+    ("deep_dive", "nvidia"): "deep_dive_nvidia.json",
+    ("deep_dive", "mistral ai"): "deep_dive_mistral_ai.json",
+    ("deep_dive", "recursion pharmaceuticals"): "deep_dive_recursion_pharma.json",
+}
+
+
+def get_fixture(mode: str, query: str) -> dict | None:
+    """Return fixture data for a known demo query, or None."""
+    key = (mode, query.strip().lower())
+    filename = FIXTURE_MAP.get(key)
+    if filename:
+        path = FIXTURES_DIR / filename
+        if path.exists():
+            return json.loads(path.read_text(encoding="utf-8"))
+    return None
+
 
 app = FastAPI(
     title="Private Company Intelligence Agent",
@@ -87,6 +113,11 @@ async def query(req: QueryRequest):
     If the result is already cached, return it as a plain JSON response.
     Otherwise stream SSE events while the LangGraph agent runs.
     """
+    # --- Fixture hit (offline / demo mode) ---------------------------------
+    fixture = get_fixture(req.mode, req.query)
+    if fixture is not None:
+        return CachedResponse(data=fixture)
+
     # --- Cache hit ----------------------------------------------------------
     cached = cache.get_report(req.mode, req.query)
     if cached is not None:
