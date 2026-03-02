@@ -101,19 +101,39 @@ class CompetitorEntry(BaseModel):
     differentiator: Optional[str] = None
 
 
+class PersonEntry(BaseModel):
+    name: str
+    title: Optional[str] = None
+    background: Optional[str] = None
+    source_url: Optional[str] = None
+
+
+class RedFlag(BaseModel):
+    content: str
+    severity: Literal["low", "medium", "high"] = "medium"
+    confidence: float = Field(ge=0.0, le=1.0, default=0.5)
+    source_urls: list[str] = []
+
+
 class DeepDiveReport(BaseModel):
     query: str
     company_name: str
+    founded: Optional[str] = None
+    headquarters: Optional[str] = None
+    headcount: Optional[str] = None
+    funding_stage: Optional[str] = None
     overview: DeepDiveSection
     funding: DeepDiveSection
     funding_rounds: list[FundingRound] = []
     key_people: DeepDiveSection
+    people_entries: list[PersonEntry] = []
     product_technology: DeepDiveSection
     recent_news: DeepDiveSection
     news_items: list[NewsItem] = []
     competitors: DeepDiveSection
     competitor_entries: list[CompetitorEntry] = []
     red_flags: DeepDiveSection
+    red_flag_entries: list[RedFlag] = []
 
 
 class CriticVerification(BaseModel):
