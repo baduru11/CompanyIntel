@@ -49,7 +49,7 @@ export default function SectionNav({ sections = [], activeSection: controlledAct
   };
 
   return (
-    <nav className="w-52 shrink-0 sticky top-0 h-fit py-4 pr-4">
+    <nav className="w-44 shrink-0 sticky top-0 h-fit py-4 pr-4">
       <ul className="space-y-1">
         {sections.map((section) => {
           const isActive = activeSection === section.id;

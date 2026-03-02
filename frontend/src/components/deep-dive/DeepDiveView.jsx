@@ -66,8 +66,11 @@ export default function DeepDiveView({ data, onDownloadPdf }) {
   const critic = data?.critic || data?.critic_report || {};
 
   // Company info (try multiple shapes)
-  const company = report.company || report.overview || {};
-  const companyName = company.name || report.company_name || report.name || "Company";
+  // overview might be a {title, content} dict or a {name, description, ...} object
+  const overviewSection = report.overview || {};
+  const isOverviewSection = typeof overviewSection === "object" && overviewSection.content;
+  const company = isOverviewSection ? {} : (report.company || overviewSection);
+  const companyName = report.company_name || company.name || report.name || "Company";
 
   // Build nav sections with confidence
   const navSections = useMemo(() => {
@@ -86,21 +89,34 @@ export default function DeepDiveView({ data, onDownloadPdf }) {
     onDownloadPdf?.();
   }, [onDownloadPdf]);
 
+  // Helper: extract text from a value that might be a string or {title, content} dict
+  const textOf = (v) => {
+    if (!v) return "";
+    if (typeof v === "string") return v;
+    if (typeof v === "object" && v.content) return v.content;
+    return "";
+  };
+
   // Data extraction helpers
-  const description = company.description || report.description || "";
+  const description = textOf(report.overview) || company.description || report.description || "";
   const metrics = [
-    { label: "Founded", value: company.founded || company.founding_year || report.founded || "—", icon: Calendar },
-    { label: "HQ", value: company.headquarters || company.hq || report.headquarters || "—", icon: MapPin },
-    { label: "Headcount", value: company.headcount || company.employees || report.headcount || "—", icon: Users },
-    { label: "Stage", value: company.stage || company.funding_stage || report.stage || "—", icon: Layers },
+    { label: "Founded", value: report.founded || company.founded || company.founding_year || "—", icon: Calendar },
+    { label: "HQ", value: report.headquarters || company.headquarters || company.hq || "—", icon: MapPin },
+    { label: "Headcount", value: report.headcount || company.headcount || company.employees || "—", icon: Users },
+    { label: "Stage", value: report.funding_stage || company.stage || company.funding_stage || "—", icon: Layers },
   ];
 
-  const fundingRounds = report.funding_rounds || report.funding?.rounds || [];
-  const people = report.key_people || report.people || [];
-  const productText = report.product || report.technology || report.product_technology || "";
-  const newsItems = report.news || report.recent_news || [];
-  const competitors = report.competitors || [];
-  const redFlags = critic.red_flags || report.red_flags || [];
+  const fundingRounds = report.funding_rounds || (Array.isArray(report.funding) ? report.funding : report.funding?.rounds) || [];
+  const fundingText = textOf(report.funding) || "";
+  const people = report.people_entries?.length ? report.people_entries : (Array.isArray(report.key_people) ? report.key_people : (Array.isArray(report.people) ? report.people : []));
+  const peopleText = textOf(report.key_people) || textOf(report.people) || "";
+  const productText = textOf(report.product_technology) || textOf(report.product) || textOf(report.technology) || "";
+  const newsItems = report.news_items || (Array.isArray(report.news) ? report.news : []) || (Array.isArray(report.recent_news) ? report.recent_news : []);
+  const newsText = textOf(report.recent_news) || textOf(report.news) || "";
+  const competitors = report.competitor_entries || (Array.isArray(report.competitors) ? report.competitors : []);
+  const competitorsText = textOf(report.competitors) || "";
+  const redFlags = report.red_flag_entries?.length ? report.red_flag_entries : (Array.isArray(critic.red_flags) ? critic.red_flags : (Array.isArray(report.red_flags) ? report.red_flags : []));
+  const redFlagsText = textOf(report.red_flags) || textOf(critic.red_flags) || "";
 
   return (
     <div className="flex h-full w-full overflow-hidden">
@@ -124,7 +140,7 @@ export default function DeepDiveView({ data, onDownloadPdf }) {
           )}
         </div>
 
-        <div className="p-6 space-y-6 max-w-4xl">
+        <div className="p-4 space-y-6 max-w-6xl">
           {/* 1. Overview */}
           <ReportSection
             id={SECTION_IDS.overview}
@@ -167,6 +183,11 @@ export default function DeepDiveView({ data, onDownloadPdf }) {
             sourceCount={getSectionSources(data, "funding").length}
             sourceUrls={getSectionSources(data, "funding")}
           >
+            {fundingText && (
+              <div className="text-sm text-[hsl(var(--muted-foreground))] leading-relaxed whitespace-pre-line mb-4">
+                {fundingText}
+              </div>
+            )}
             <FundingChart fundingRounds={fundingRounds} />
           </ReportSection>
 
@@ -205,6 +226,10 @@ export default function DeepDiveView({ data, onDownloadPdf }) {
                     </div>
                   </div>
                 ))}
+              </div>
+            ) : peopleText ? (
+              <div className="text-sm text-[hsl(var(--muted-foreground))] leading-relaxed whitespace-pre-line">
+                {peopleText}
               </div>
             ) : (
               <p className="text-sm text-[hsl(var(--muted-foreground))] italic">
@@ -246,6 +271,10 @@ export default function DeepDiveView({ data, onDownloadPdf }) {
                   <NewsCard key={item.title || i} newsItem={item} />
                 ))}
               </div>
+            ) : newsText ? (
+              <div className="text-sm text-[hsl(var(--muted-foreground))] leading-relaxed whitespace-pre-line">
+                {newsText}
+              </div>
             ) : (
               <p className="text-sm text-[hsl(var(--muted-foreground))] italic">
                 No recent news available.
@@ -261,7 +290,17 @@ export default function DeepDiveView({ data, onDownloadPdf }) {
             sourceCount={getSectionSources(data, "competitors").length}
             sourceUrls={getSectionSources(data, "competitors")}
           >
-            <CompetitorTable competitors={competitors} />
+            {competitors.length > 0 ? (
+              <CompetitorTable competitors={competitors} />
+            ) : competitorsText ? (
+              <div className="text-sm text-[hsl(var(--muted-foreground))] leading-relaxed whitespace-pre-line">
+                {competitorsText}
+              </div>
+            ) : (
+              <p className="text-sm text-[hsl(var(--muted-foreground))] italic">
+                No competitor data available.
+              </p>
+            )}
           </ReportSection>
 
           {/* 7. Red Flags */}
@@ -289,6 +328,10 @@ export default function DeepDiveView({ data, onDownloadPdf }) {
                     />
                   );
                 })}
+              </div>
+            ) : redFlagsText ? (
+              <div className="text-sm text-[hsl(var(--muted-foreground))] leading-relaxed whitespace-pre-line">
+                {redFlagsText}
               </div>
             ) : (
               <p className="text-sm text-emerald-400/80 italic">

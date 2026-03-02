@@ -10,6 +10,26 @@ import {
 import { useMemo } from "react";
 
 /**
+ * Parse a funding amount string like "$10M", "$6.9B", "~$16.3M",
+ * "$150M upfront (Roche/Genentech)" into a numeric value in dollars.
+ */
+function parseAmount(raw) {
+  if (raw == null) return 0;
+  if (typeof raw === "number") return raw;
+  const str = String(raw).trim();
+  const match = str.match(/\$?\s*~?\s*([\d,.]+)\s*(T|B|M|K)?/i);
+  if (!match) return 0;
+  let num = parseFloat(match[1].replace(/,/g, ""));
+  if (isNaN(num)) return 0;
+  const suffix = (match[2] || "").toUpperCase();
+  if (suffix === "T") num *= 1_000_000_000_000;
+  else if (suffix === "B") num *= 1_000_000_000;
+  else if (suffix === "M") num *= 1_000_000;
+  else if (suffix === "K") num *= 1_000;
+  return num;
+}
+
+/**
  * Format a number as a compact funding string, e.g. "$12.5M"
  */
 function formatAmount(value) {
@@ -59,7 +79,7 @@ export default function FundingChart({ fundingRounds = [] }) {
     // Build cumulative funding
     let cumulative = 0;
     return sorted.map((round) => {
-      const amt = Number(round.amount) || 0;
+      const amt = parseAmount(round.amount);
       cumulative += amt;
       const investors = Array.isArray(round.investors)
         ? round.investors.join(", ")

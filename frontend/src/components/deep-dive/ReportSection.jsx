@@ -46,7 +46,7 @@ export default function ReportSection({
           className
         )}
       >
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4 pb-3">
           <CardTitle className="text-lg font-semibold text-[hsl(var(--foreground))]">
             {title}
           </CardTitle>
@@ -58,7 +58,7 @@ export default function ReportSection({
             />
           )}
         </CardHeader>
-        <CardContent>{children}</CardContent>
+        <CardContent className="px-4 pb-4 pt-0">{children}</CardContent>
       </Card>
     </section>
   );
