@@ -54,6 +54,59 @@ class TestDeepDiveFixtures:
         assert data.get("cached") is True or "data" in data
 
 
+class TestDeepDiveFixtureMetadata:
+    """Verify that fixture files contain the structured metadata fields."""
+
+    def _get_report(self, query):
+        resp = client.post("/api/query", json={"query": query, "mode": "deep_dive"})
+        assert resp.status_code == 200
+        data = resp.json()
+        result = data.get("data", data)
+        return result.get("report", result)
+
+    def test_nvidia_metadata(self):
+        report = self._get_report("NVIDIA")
+        assert report["founded"] == "1993"
+        assert report["headquarters"] == "Santa Clara, California"
+        assert report["headcount"] == "~30,000"
+        assert report["funding_stage"] == "IPO / Public"
+
+    def test_nvidia_people_entries(self):
+        report = self._get_report("NVIDIA")
+        assert len(report["people_entries"]) >= 3
+        names = [p["name"] for p in report["people_entries"]]
+        assert "Jensen Huang" in names
+
+    def test_nvidia_red_flag_entries(self):
+        report = self._get_report("NVIDIA")
+        assert len(report["red_flag_entries"]) >= 3
+        assert all("content" in rf for rf in report["red_flag_entries"])
+
+    def test_mistral_metadata(self):
+        report = self._get_report("Mistral AI")
+        assert report["founded"] == "April 2023"
+        assert report["headquarters"] == "Paris, France"
+        assert report["funding_stage"] == "Series B"
+
+    def test_mistral_people_entries(self):
+        report = self._get_report("Mistral AI")
+        assert len(report["people_entries"]) >= 3
+        names = [p["name"] for p in report["people_entries"]]
+        assert "Arthur Mensch" in names
+
+    def test_recursion_metadata(self):
+        report = self._get_report("Recursion Pharmaceuticals")
+        assert report["founded"] == "2013"
+        assert report["headquarters"] == "Salt Lake City, Utah"
+        assert report["funding_stage"] == "IPO / Public"
+
+    def test_recursion_people_entries(self):
+        report = self._get_report("Recursion Pharmaceuticals")
+        assert len(report["people_entries"]) >= 3
+        names = [p["name"] for p in report["people_entries"]]
+        assert "Chris Gibson" in names
+
+
 class TestFixtureCaseInsensitivity:
     def test_fixture_case_insensitive_lowercase(self):
         """Fixtures should match case-insensitively (lowercase)."""
