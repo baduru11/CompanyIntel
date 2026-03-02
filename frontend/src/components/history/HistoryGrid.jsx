@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Search, FileText } from "lucide-react";
 import { Input } from "../ui/input";
-import { fetchHistory } from "../../lib/api";
+import { fetchHistory, deleteReport } from "../../lib/api";
 import { cn } from "../../lib/utils";
 import HistoryCard from "./HistoryCard";
 
@@ -15,6 +15,12 @@ export default function HistoryGrid({ onSelectReport }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
+
+  const handleDelete = (filename) => {
+    deleteReport(filename)
+      .then(() => setReports((prev) => prev.filter((r) => r.filename !== filename)))
+      .catch((err) => console.warn("Could not delete report:", err.message));
+  };
 
   // Fetch history on mount
   useEffect(() => {
@@ -105,6 +111,7 @@ export default function HistoryGrid({ onSelectReport }) {
               key={report.id || report.cached_at || i}
               report={report}
               onSelect={onSelectReport}
+              onDelete={handleDelete}
             />
           ))}
         </div>
