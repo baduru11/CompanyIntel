@@ -2,6 +2,10 @@
   "report": {
     "query": "NVIDIA",
     "company_name": "NVIDIA Corporation",
+    "founded": "1993",
+    "headquarters": "Santa Clara, California",
+    "headcount": "~30,000",
+    "funding_stage": "IPO / Public",
     "overview": {
       "title": "Overview",
       "content": "NVIDIA Corporation is a multinational technology company headquartered in Santa Clara, California, widely recognized as the dominant force in AI computing hardware. Founded in 1993 by Jensen Huang, Chris Malachowsky, and Curtis Priem, the company initially focused on graphics processing units (GPUs) for gaming but has transformed into the backbone of the AI revolution.\n\nNVIDIA designs and sells GPUs, system-on-chip units, and related software for gaming, professional visualization, data centers, and automotive markets. The company's CUDA parallel computing platform, introduced in 2006, created an ecosystem that has become the de facto standard for AI/ML development.\n\nAs of early 2025, NVIDIA has a market capitalization exceeding $3 trillion, making it one of the most valuable companies in the world. The company's data center segment has become its largest revenue driver, fueled by insatiable demand for AI training and inference hardware from hyperscalers (Microsoft, Google, Amazon, Meta) and enterprise customers.\n\nNVIDIA trades on NASDAQ under the ticker symbol NVDA. The company employs approximately 30,000 people globally and operates major R&D centers in the US, Israel, India, and Taiwan.",
@@ -74,6 +78,38 @@
       ],
       "source_count": 3
     },
+    "people_entries": [
+      {
+        "name": "Jensen Huang",
+        "title": "Co-Founder, President & CEO",
+        "background": "Co-founded NVIDIA in 1993. BSEE from Oregon State University, MSEE from Stanford. One of the longest-tenured CEOs in tech.",
+        "source_url": "https://nvidianews.nvidia.com/bios/jensen-huang"
+      },
+      {
+        "name": "Colette Kress",
+        "title": "EVP & CFO",
+        "background": "CFO since 2013. Previously held senior finance roles at Cisco Systems and Microsoft.",
+        "source_url": "https://nvidianews.nvidia.com/bios"
+      },
+      {
+        "name": "Debora Shoquist",
+        "title": "EVP, Operations",
+        "background": "Leads global operations including supply chain, manufacturing partnerships with TSMC, and quality.",
+        "source_url": "https://nvidianews.nvidia.com/bios"
+      },
+      {
+        "name": "Chris Malachowsky",
+        "title": "Co-Founder, Fellow",
+        "background": "Co-founded NVIDIA with Jensen Huang and Curtis Priem. Serves as an NVIDIA Fellow focused on advanced research.",
+        "source_url": "https://www.nvidia.com/en-us/about-nvidia/board-of-directors/"
+      },
+      {
+        "name": "Ian Buck",
+        "title": "VP & GM, Accelerated Computing",
+        "background": "Leads GPU computing business and was instrumental in creating CUDA. Pioneered GPU computing research at Stanford.",
+        "source_url": "https://nvidianews.nvidia.com/bios"
+      }
+    ],
     "product_technology": {
       "title": "Product/Technology",
       "content": "NVIDIA's product portfolio spans hardware accelerators, networking, software platforms, and cloud services:\n\n**Data Center GPUs (AI Training & Inference)**\n- H100/H200: Hopper architecture GPUs, the workhorse of current AI training. H100 delivers up to 4 petaflops of FP8 performance.\n- B100/B200/GB200: Blackwell architecture (2024+), offering up to 2.5x improvement over Hopper for AI training. The GB200 NVL72 rack-scale system combines 72 Blackwell GPUs.\n- A100: Ampere architecture, still widely deployed for inference workloads.\n\n**Networking**\n- InfiniBand (ConnectX, Quantum switches): Ultra-low-latency networking for GPU clusters, acquired via Mellanox.\n- NVLink/NVSwitch: Proprietary high-bandwidth GPU interconnect enabling multi-GPU scaling.\n- Spectrum-X: Ethernet networking platform optimized for AI workloads.\n\n**Software Ecosystem**\n- CUDA: Parallel computing platform and API (introduced 2006), the foundation of NVIDIA's AI software moat.\n- TensorRT: Inference optimization engine for deploying trained models.\n- cuDNN: GPU-accelerated library for deep neural networks.\n- Triton Inference Server: Open-source inference serving software.\n- NVIDIA AI Enterprise: Full enterprise AI software suite.\n\n**Platforms**\n- DGX Systems: Integrated AI supercomputers for enterprise and research.\n- DGX Cloud: AI computing as a service, partnered with major cloud providers.\n- Omniverse: Platform for 3D simulation and digital twins.\n- DRIVE: Autonomous vehicle computing platform.\n- Isaac: Robotics development platform.\n- Clara: Healthcare and drug discovery AI platform.\n\n**Gaming**\n- GeForce RTX 40-series (Ada Lovelace architecture): Consumer GPUs with ray tracing and DLSS AI upscaling.\n- GeForce NOW: Cloud gaming streaming service.",
@@ -204,7 +240,45 @@
         "https://www.ftc.gov/"
       ],
       "source_count": 3
-    }
+    },
+    "red_flag_entries": [
+      {
+        "content": "Customer Concentration: A significant portion of data center revenue comes from a handful of hyperscaler customers. Loss of any major customer or shift to custom silicon could materially impact revenue.",
+        "severity": "medium",
+        "confidence": 0.85,
+        "source_urls": ["https://investor.nvidia.com/financial-info/sec-filings"]
+      },
+      {
+        "content": "Export Controls: US government restrictions on selling advanced AI chips to China have already reduced NVIDIA's China revenue significantly. Further restrictions could expand to other regions.",
+        "severity": "high",
+        "confidence": 0.90,
+        "source_urls": ["https://www.reuters.com/technology/"]
+      },
+      {
+        "content": "Supply Chain Dependency: NVIDIA depends almost entirely on TSMC for manufacturing its most advanced chips. Geopolitical tensions around Taiwan represent a systemic risk.",
+        "severity": "high",
+        "confidence": 0.80,
+        "source_urls": ["https://investor.nvidia.com/financial-info/sec-filings"]
+      },
+      {
+        "content": "Valuation Risk: Trading at historically high multiples, NVIDIA's stock price assumes sustained hypergrowth. Any deceleration in AI infrastructure spending could trigger significant multiple compression.",
+        "severity": "medium",
+        "confidence": 0.75,
+        "source_urls": ["https://investor.nvidia.com/"]
+      },
+      {
+        "content": "Custom Silicon Threat: Every major hyperscaler is investing billions in custom AI chips that could displace NVIDIA in specific workloads over time.",
+        "severity": "medium",
+        "confidence": 0.80,
+        "source_urls": ["https://www.reuters.com/technology/"]
+      },
+      {
+        "content": "Antitrust Scrutiny: NVIDIA's dominant market position has attracted regulatory attention in the US and EU, with investigations into bundling practices and potential anti-competitive behavior.",
+        "severity": "low",
+        "confidence": 0.65,
+        "source_urls": ["https://www.ftc.gov/"]
+      }
+    ]
   },
   "critic": {
     "overall_confidence": 0.87,

@@ -2,6 +2,10 @@
   "report": {
     "query": "Recursion Pharmaceuticals",
     "company_name": "Recursion Pharmaceuticals",
+    "founded": "2013",
+    "headquarters": "Salt Lake City, Utah",
+    "headcount": "~600-700",
+    "funding_stage": "IPO / Public",
     "overview": {
       "title": "Overview",
       "content": "Recursion Pharmaceuticals (NASDAQ: RXRX) is a clinical-stage biotechnology company that combines artificial intelligence, machine learning, and automation to industrialize drug discovery. Founded in 2013 and headquartered in Salt Lake City, Utah, the company has built one of the world's largest proprietary biological and chemical datasets.\n\nRecursion's platform, called Recursion OS, integrates automated wet-lab biology (high-throughput cellular imaging), large-scale compute, and advanced machine learning models to map cellular biology at scale. The company generates massive datasets by perturbing human cells with genetic knockdowns, chemical compounds, and other interventions, then imaging them with automated microscopy. The resulting dataset — comprising trillions of data points — enables AI models to identify novel drug targets and therapeutic candidates.\n\nThe company went public in April 2021 through an IPO on NASDAQ. Recursion has expanded its platform through strategic acquisitions and partnerships, most notably a major collaboration with Roche and Genentech. As of early 2025, Recursion has multiple programs in clinical trials and a broad preclinical pipeline spanning oncology, rare diseases, and infectious diseases.\n\nRecursion employs approximately 600-700 people and operates automated biology labs in Salt Lake City and Toronto (via its acquisition of Cyclica).",
@@ -81,6 +85,38 @@
       ],
       "source_count": 3
     },
+    "people_entries": [
+      {
+        "name": "Chris Gibson",
+        "title": "Co-Founder & CEO",
+        "background": "PhD in genetics and epidemiology from University of Utah. Founded Recursion in 2013 based on research repurposing existing drugs using cellular imaging.",
+        "source_url": "https://www.recursion.com/team"
+      },
+      {
+        "name": "Dean Li",
+        "title": "Co-Founder",
+        "background": "MD, PhD. Cardiologist and scientist who co-founded Recursion. Subsequently became President of Merck Research Laboratories at Merck & Co.",
+        "source_url": "https://www.recursion.com/team"
+      },
+      {
+        "name": "Heather Kirkby",
+        "title": "Chief Operating Officer",
+        "background": "Oversees Recursion's operations including automated biology laboratories and manufacturing partnerships.",
+        "source_url": "https://www.recursion.com/team"
+      },
+      {
+        "name": "Katherine Bock",
+        "title": "Chief Financial Officer",
+        "background": "Leads financial strategy, investor relations, and capital allocation as the company scales its clinical pipeline.",
+        "source_url": "https://ir.recursion.com/"
+      },
+      {
+        "name": "Mike Secora",
+        "title": "Chief Technology Officer",
+        "background": "Leads the engineering and compute infrastructure that powers Recursion OS.",
+        "source_url": "https://www.recursion.com/team"
+      }
+    ],
     "product_technology": {
       "title": "Product/Technology",
       "content": "Recursion's core asset is its Recursion OS platform, which integrates automated biology, large-scale computation, and AI/ML to accelerate drug discovery.\n\n**Automated Biology (Wet Lab):**\n- High-throughput automated labs in Salt Lake City process millions of experiments per week.\n- Automated cellular imaging captures phenotypic responses to genetic and chemical perturbations.\n- The company has generated one of the largest proprietary biological datasets in the world, comprising petabytes of cellular images.\n- Cells are perturbed using CRISPR gene knockdowns, small molecules, and other interventions, then imaged with automated fluorescence microscopy.\n\n**Recursion OS (Software/AI Platform):**\n- The platform ingests and processes massive biological datasets to build \"maps of biology\" that reveal relationships between genes, pathways, and diseases.\n- Machine learning models trained on this data can predict novel drug targets and identify therapeutic candidates.\n- The MatchMaker AI tool identifies potential drug-target interactions from the biological dataset.\n- Generative chemistry models (enhanced by the Valence Discovery acquisition) design novel molecules optimized for target activity, selectivity, and drug-like properties.\n- LOWE (Large Language Model for Omics and Wet-lab Experiments) — Recursion's foundation model trained on biological data.\n\n**Clinical Pipeline:**\n- REC-4881 (Phase 2): Oral MEK inhibitor for familial adenomatous polyposis (FAP), a genetic condition that predisposes to colorectal cancer. Originally discovered by Recursion's platform as a repurposed compound.\n- REC-994 (Phase 2): Cerebral cavernous malformations (CCM), a rare vascular disease with no approved treatments.\n- REC-3964 (Phase 1): Antiviral targeting C. difficile infections.\n- Multiple additional preclinical programs in oncology and rare diseases.\n\n**Roche/Genentech Partnership:**\n- A multi-year collaboration leveraging Recursion OS for up to 40 programs across oncology and neuroscience.\n- Roche gained access to Recursion's platform for target identification and drug candidate generation.\n- The deal includes $150M upfront and potential milestone payments.\n\n**Compute Infrastructure:**\n- Recursion operates one of the largest supercomputers in the pharmaceutical industry, powered by NVIDIA GPUs, to train its AI models on biological data.",
@@ -211,7 +247,45 @@
         "https://clinicaltrials.gov/"
       ],
       "source_count": 3
-    }
+    },
+    "red_flag_entries": [
+      {
+        "content": "Clinical Translation Risk: Despite impressive AI capabilities, Recursion has not yet produced an FDA-approved drug. Clinical failure is always possible regardless of how the target was identified.",
+        "severity": "high",
+        "confidence": 0.85,
+        "source_urls": ["https://ir.recursion.com/", "https://clinicaltrials.gov/"]
+      },
+      {
+        "content": "Revenue Concentration and Cash Burn: Minimal product revenue; relies on partnership income and capital markets. Burning approximately $80-100M per quarter.",
+        "severity": "high",
+        "confidence": 0.85,
+        "source_urls": ["https://ir.recursion.com/", "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001601830"]
+      },
+      {
+        "content": "Platform Validation Timeline: May take 5-10 years before partnered programs yield approved drugs and royalty revenue.",
+        "severity": "medium",
+        "confidence": 0.75,
+        "source_urls": ["https://ir.recursion.com/"]
+      },
+      {
+        "content": "Stock Volatility and Dilution: RXRX has been highly volatile; follow-on offerings and stock-based acquisitions dilute existing shareholders.",
+        "severity": "medium",
+        "confidence": 0.80,
+        "source_urls": ["https://ir.recursion.com/"]
+      },
+      {
+        "content": "Competitive Intensity: Well-funded competitors (Insitro, Isomorphic Labs, Xaira) and pharma companies building internal AI capabilities could narrow Recursion's data moat.",
+        "severity": "medium",
+        "confidence": 0.75,
+        "source_urls": ["https://www.reuters.com/business/healthcare-pharmaceuticals/"]
+      },
+      {
+        "content": "Key Person Dependency: CEO Chris Gibson is central to the company's vision and investor narrative. His departure would be material.",
+        "severity": "medium",
+        "confidence": 0.70,
+        "source_urls": ["https://www.recursion.com/team"]
+      }
+    ]
   },
   "critic": {
     "overall_confidence": 0.83,
