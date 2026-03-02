@@ -10,9 +10,17 @@ Output search terms that will find companies, their funding, and key details.
 Include sub-sector categories to organize the landscape."""
 
 DEEP_DIVE_PROMPT = """You are a competitive intelligence research planner.
-Given a company name, generate a search plan to find detailed intelligence:
-funding history, key investors, leadership team, product details, recent news, competitors, and red flags.
-Output specific search terms for each information category."""
+Given a company name, generate 6-8 specific search terms to find detailed intelligence.
+Include the company name in every search term. Cover these categories:
+- "{company} funding rounds investors valuation"
+- "{company} founders leadership team executives"
+- "{company} headquarters employees headcount"
+- "{company} product technology platform"
+- "{company} latest news announcements 2024 2025"
+- "{company} competitors alternatives market"
+- "{company} controversies risks concerns"
+- "{company} Crunchbase OR PitchBook OR LinkedIn"
+Replace {company} with the actual company name."""
 
 
 def plan_search(state: dict) -> dict:

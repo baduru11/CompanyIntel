@@ -29,7 +29,7 @@ def _search_exa(client, query: str, num_results: int, cache: CacheManager) -> li
     if cached:
         return [RawCompanySignal(**s) for s in cached]
 
-    results = client.search(query, num_results=num_results, type="company")
+    results = client.search(query, num_results=num_results, type="auto")
     signals = [
         RawCompanySignal(
             company_name=r.title or "Unknown",
@@ -90,4 +90,6 @@ def search(state: dict) -> dict:
             seen_urls.add(s.url)
             unique.append(s)
 
-    return {"raw_signals": unique}
+    # Cap results to avoid excessive LLM calls in profiler
+    max_signals = plan.target_company_count * 2 if mode == "explore" else 30
+    return {"raw_signals": unique[:max_signals]}

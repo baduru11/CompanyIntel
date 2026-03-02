@@ -4,10 +4,32 @@ import httpx
 from backend.models import RawCompanySignal, CompanyProfile
 from backend.config import get_llm
 
-EXTRACTION_PROMPT = """Extract structured company data from these sources.
-Only include information explicitly present in the source text.
-If data is missing, leave the field as null. Never guess or infer.
-For each field you populate, set the corresponding source_url to where you found it."""
+EXTRACTION_PROMPT = """Extract structured company data from the provided sources.
+Only include information explicitly stated in the source text. Never guess or infer.
+
+You MUST attempt to extract ALL of the following fields:
+
+- name: The company's official name
+- description: A 2-3 sentence summary of what the company does
+- website: The company's primary website URL
+- funding_total: Total funding raised (e.g. "$1.2B", "$50M"). Set funding_source_url too.
+- funding_stage: Current stage (e.g. "Series B", "IPO / Public", "Seed").
+  Set funding_stage_source_url too.
+- key_investors: List of investor names (e.g. ["Sequoia Capital", "a16z"])
+- founding_year: Year founded as integer (e.g. 2018). Set founding_year_source_url too.
+- headcount_estimate: Approximate employees as string (e.g. "~500", "200-300")
+- headquarters: City and region (e.g. "San Francisco, California")
+- core_product: Main product or service (1-2 sentences)
+- core_technology: Key technology used or developed (1-2 sentences)
+- key_people: List of dicts with "name", "title", and optionally "background"
+  Example: [{"name": "Jane Doe", "title": "CEO", "background": "Previously VP at Google"}]
+- recent_news: List of dicts with "title", "date", "snippet"
+  Example: [{"title": "Company raises $50M", "date": "2024-03", "snippet": "..."}]
+- sub_sector: The company's specific sub-sector within its industry
+- raw_sources: List of all source URLs used
+
+If a field's data is not in the sources, leave it null or empty. For each factual field
+you populate, set the corresponding source_url field to where you found it."""
 
 
 def crawl_page(url: str, timeout: float = 30.0) -> str | None:
@@ -64,11 +86,11 @@ def profile(state: dict) -> dict:
 
         extra_content = ""
         if mode == "deep_dive":
-            urls = list({s.url for s in company_signals})[:3]
+            urls = list({s.url for s in company_signals})[:5]
             for url in urls:
                 page = crawl_page(url)
                 if page:
-                    extra_content += f"\n\n--- Full page: {url} ---\n{page[:3000]}"
+                    extra_content += f"\n\n--- Full page: {url} ---\n{page[:5000]}"
 
         combined = f"{snippets}{extra_content}"
 
