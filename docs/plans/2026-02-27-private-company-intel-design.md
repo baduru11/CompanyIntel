@@ -15,9 +15,9 @@ A full-stack web app that provides professional-grade competitive intelligence o
 | Layer | Technology | Notes |
 |-------|-----------|-------|
 | Backend | Python + FastAPI + LangGraph | Agent orchestration with stateful graph |
-| LLM | Google Gemini 2.5 Flash (paid tier) | Swappable via `config.py` factory to OpenAI/Claude |
-| Web Search | Tavily API | 1,000 free credits/month, primary web search |
-| Semantic Discovery | Exa API | 1,000 free credits, semantic company finding |
+| LLM | DeepSeek V3.2 via OpenRouter | Swappable via `LLM_MODEL` env var. Parallel synthesis for deep-dive (12 sections + 1 metadata call) |
+| Web Search | Tavily API + Serper API | Multi-provider search in parallel |
+| Semantic Discovery | Exa API | Semantic company finding, runs in parallel with Tavily/Serper |
 | Page Extraction (primary) | Crawl4AI | Free, open source, local Playwright-based |
 | Page Extraction (fallback) | Jina Reader | Free, no API key, prepend `r.jina.ai/` to any URL |
 | Frontend | React + Tailwind CSS + shadcn/ui | Professional dark theme, 50+ components |
@@ -30,11 +30,11 @@ A full-stack web app that provides professional-grade competitive intelligence o
 ### Environment Variables
 
 ```
-GEMINI_API_KEY          # required
-TAVILY_API_KEY          # required
-EXA_API_KEY             # required
-OPENAI_API_KEY          # optional fallback
-ANTHROPIC_API_KEY       # optional fallback
+OPENROUTER_API_KEY      # required — routes to DeepSeek/GPT-4o/Claude via OpenRouter
+TAVILY_API_KEY          # required — web search provider
+EXA_API_KEY             # required — semantic search provider
+SERPER_API_KEY          # optional — Google search provider (Serper.dev)
+LLM_MODEL               # optional — default: deepseek/deepseek-v3.2
 ```
 
 Note: Crawl4AI and Jina Reader require no API keys.
@@ -50,18 +50,18 @@ Rather than one graph with branching logic, two dedicated subgraphs keep each fl
 **Explore Mode Graph:**
 
 ```
-Planner → Searcher → Profiler (lightweight) → Synthesis → Critic
-             ↑                                               |
-             └──────────── (max 1 retry) ────────────────────┘
+Planner → Searcher → Profiler (lightweight) → Synthesis → Critic → END
 ```
 
 **Deep Dive Graph:**
 
 ```
-Planner → Searcher → Profiler (full extraction) → Synthesis → Critic
-             ↑                                                  |
-             └──────────── (max 1 retry) ──────────────────────┘
+Planner → Searcher → Profiler (full extraction) → Synthesis (parallel sections) → Critic → END
 ```
+
+> **Note (2026-03-13):** Retry loop removed — pipeline is now linear. Deep Dive synthesis
+> runs 12 section-level LLM calls in parallel via ThreadPoolExecutor + 1 metadata extraction call.
+> Search uses 3 providers (Tavily, Exa, Serper) in parallel.
 
 ### Node Descriptions
 
@@ -92,12 +92,11 @@ Planner → Searcher → Profiler (full extraction) → Synthesis → Critic
 - Output: `ExploreReport` or `DeepDiveReport` Pydantic model
 
 **Critic Node**
-- Receives both Synthesis output AND raw Profiler source data
+- Receives both Synthesis output AND raw Profiler source URLs
 - Cross-checks every claim against raw sources
 - Flags unverified claims, conflicting data, missing sections
 - Assigns per-section confidence score (0.0–1.0)
-- If critical data gaps found AND retry count < 1: routes back to Searcher with specific gaps to fill
-- If retry already happened OR gaps are minor: flags them and moves to output
+- Terminal node — no retry loop (pipeline is linear)
 - Output: `CriticReport` with verified/unverified flags per data point
 
 ### LangGraph State
@@ -105,17 +104,18 @@ Planner → Searcher → Profiler (full extraction) → Synthesis → Critic
 State persists across all nodes. Schema:
 
 ```python
-class AgentState(TypedDict):
+class AgentState(TypedDict, total=False):
     query: str
-    mode: Literal["explore", "deep_dive"]
+    mode: str
     search_plan: SearchPlan
     raw_signals: list[RawCompanySignal]
     company_profiles: list[CompanyProfile]
     report: Union[ExploreReport, DeepDiveReport]
     critic_report: CriticReport
-    retry_count: int  # max 1
-    status_events: list[StatusEvent]  # SSE events emitted
+    status_events: Annotated[list[StatusEvent], operator.add]
 ```
+
+> **Note (2026-03-13):** `retry_count` and `retry_targets` removed — no retry loop.
 
 ---
 
