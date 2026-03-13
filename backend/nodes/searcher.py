@@ -92,13 +92,34 @@ def search(state: dict) -> dict:
         except Exception as exc:
             logger.warning("Failed to create Tavily client: %s", exc)
 
-        if exa is not None:
-            for term in plan.search_terms:
-                signals.extend(_search_exa(exa, term, plan.target_company_count, cache))
+        # Run Exa and Tavily searches concurrently
+        from concurrent.futures import ThreadPoolExecutor
 
-        if len(signals) < 5 and tavily is not None:
-            for term in plan.search_terms:
-                signals.extend(_search_tavily(tavily, term, cache))
+        def _run_exa_searches():
+            results = []
+            if exa is not None:
+                for term in plan.search_terms:
+                    results.extend(_search_exa(exa, term, plan.target_company_count, cache))
+            return results
+
+        def _run_tavily_searches():
+            results = []
+            if tavily is not None:
+                for term in plan.search_terms:
+                    results.extend(_search_tavily(tavily, term, cache))
+            return results
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            exa_future = pool.submit(_run_exa_searches)
+            tavily_future = pool.submit(_run_tavily_searches)
+
+            exa_results = exa_future.result()
+            tavily_results = tavily_future.result()
+
+        signals.extend(exa_results)
+        # Only add Tavily results if Exa didn't find enough
+        if len(signals) < 5:
+            signals.extend(tavily_results)
     else:
         try:
             tavily = get_tavily_client()
