@@ -1,10 +1,28 @@
 # backend/nodes/synthesis.py
 from __future__ import annotations
+import logging
+from langchain_core.messages import SystemMessage, HumanMessage
 from backend.config import get_llm
 from backend.models import CompanyProfile, ExploreReport, DeepDiveReport
 
+logger = logging.getLogger(__name__)
+
 EXPLORE_SYSTEM = """You are a competitive intelligence analyst. Given company profiles,
 create a structured competitive landscape report.
+
+INPUT FIELD MAPPING — populate each company with:
+- name: company name
+- sub_sector: specific technology/market niche
+- funding_total: string like "$720M", "Public (IPO 1999)"
+- funding_numeric: number in millions (0 for public companies)
+- funding_stage: e.g. "Seed", "Series A", "Series B", "Series C+", "IPO / Public"
+- founding_year: integer year
+- headquarters: city, state/country
+- key_investors: list of investor names
+- description: 2-3 sentence company description
+- confidence: 0.0-1.0 based on source coverage
+- source_count: number of sources used
+
 CRITICAL: Only include information from the provided data. Write 'Data not available' for missing fields. Never guess."""
 
 DEEP_DIVE_SYSTEM = """You are a competitive intelligence analyst. Given company profile data,
@@ -56,17 +74,21 @@ def synthesize(state: dict) -> dict:
         for p in profiles
     )
 
-    if mode == "explore":
-        structured_llm = llm.with_structured_output(ExploreReport)
-        report = structured_llm.invoke([
-            {"role": "system", "content": EXPLORE_SYSTEM},
-            {"role": "user", "content": f"Query: {state['query']}\n\nCompany profiles:\n{profiles_text}"}
-        ])
-    else:
-        structured_llm = llm.with_structured_output(DeepDiveReport)
-        report = structured_llm.invoke([
-            {"role": "system", "content": DEEP_DIVE_SYSTEM},
-            {"role": "user", "content": f"Company: {state['query']}\n\nCollected data:\n{profiles_text}"}
-        ])
+    try:
+        if mode == "explore":
+            structured_llm = llm.with_structured_output(ExploreReport)
+            report = structured_llm.invoke([
+                SystemMessage(content=EXPLORE_SYSTEM),
+                HumanMessage(content=f"Query: {state['query']}\n\nCompany profiles:\n{profiles_text}")
+            ])
+        else:
+            structured_llm = llm.with_structured_output(DeepDiveReport)
+            report = structured_llm.invoke([
+                SystemMessage(content=DEEP_DIVE_SYSTEM),
+                HumanMessage(content=f"Company: {state['query']}\n\nCollected data:\n{profiles_text}")
+            ])
+    except Exception as exc:
+        logger.error("Synthesis LLM call failed for query=%s mode=%s: %s", state['query'], mode, exc)
+        raise RuntimeError(f"Synthesis failed: {exc}") from exc
 
     return {"report": report}

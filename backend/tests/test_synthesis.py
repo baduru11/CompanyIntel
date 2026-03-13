@@ -152,7 +152,7 @@ class TestSynthesisExplore:
 
         # Check that the invoke call includes query and company data
         call_args = mock_structured.invoke.call_args[0][0]
-        user_msg = call_args[1]["content"]
+        user_msg = call_args[1].content
         assert "AI startups" in user_msg
         assert "Acme Corp" in user_msg
 
@@ -217,7 +217,7 @@ class TestSynthesisDeepDive:
             })
 
         call_args = mock_structured.invoke.call_args[0][0]
-        user_msg = call_args[1]["content"]
+        user_msg = call_args[1].content
         assert "Acme Corp" in user_msg
         assert "Acme builds NLP tools" in user_msg
 
@@ -258,7 +258,7 @@ class TestSynthesisAntiHallucination:
             })
 
         call_args = mock_structured.invoke.call_args[0][0]
-        system_msg = call_args[0]["content"]
+        system_msg = call_args[0].content
         assert system_msg == EXPLORE_SYSTEM
 
     def test_synthesis_deep_dive_system_prompt_sent_to_llm(self):
@@ -281,5 +281,22 @@ class TestSynthesisAntiHallucination:
             })
 
         call_args = mock_structured.invoke.call_args[0][0]
-        system_msg = call_args[0]["content"]
+        system_msg = call_args[0].content
         assert system_msg == DEEP_DIVE_SYSTEM
+
+
+class TestSynthesisErrorHandling:
+    def test_raises_descriptive_error_on_llm_failure(self):
+        """Synthesis should raise a clear error when LLM fails."""
+        from backend.nodes.synthesis import synthesize
+
+        mock_llm = MagicMock()
+        mock_structured = MagicMock()
+        mock_structured.invoke.side_effect = Exception("API timeout")
+        mock_llm.with_structured_output.return_value = mock_structured
+
+        profiles = [_make_profile("Acme Corp")]
+
+        with patch("backend.nodes.synthesis.get_llm", return_value=mock_llm):
+            with pytest.raises(RuntimeError, match="Synthesis failed"):
+                synthesize({"query": "AI chips", "mode": "explore", "company_profiles": profiles})

@@ -1,8 +1,11 @@
 # backend/nodes/planner.py
 from __future__ import annotations
+import logging
 from langchain_core.messages import SystemMessage, HumanMessage
 from backend.config import get_llm
 from backend.models import SearchPlan
+
+logger = logging.getLogger(__name__)
 
 EXPLORE_PROMPT = """You are a competitive intelligence research planner.
 Given a sector query, generate a search plan to discover 10-20 companies in this space.
@@ -36,9 +39,13 @@ def plan_search(state: dict) -> dict:
         gaps = state["critic_report"].gaps
         retry_context = f"\n\nPrevious search had gaps: {', '.join(gaps)}. Focus on filling these."
 
-    plan = structured_llm.invoke([
-        SystemMessage(content=prompt),
-        HumanMessage(content=f"Query: {query}{retry_context}")
-    ])
+    try:
+        plan = structured_llm.invoke([
+            SystemMessage(content=prompt),
+            HumanMessage(content=f"Query: {query}{retry_context}")
+        ])
+    except Exception as exc:
+        logger.error("Planner LLM call failed for query=%s: %s", query, exc)
+        raise RuntimeError(f"Planner failed: {exc}") from exc
 
     return {"search_plan": plan}

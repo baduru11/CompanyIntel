@@ -59,3 +59,18 @@ def test_planner_includes_retry_context():
     with patch("backend.nodes.planner.get_llm", return_value=mock_llm):
         result = plan_search(state)
     assert "search_plan" in result
+
+
+class TestPlannerErrorHandling:
+    def test_raises_descriptive_error_on_llm_failure(self):
+        """Planner should raise a clear error when LLM fails, not a raw exception."""
+        from backend.nodes.planner import plan_search
+
+        mock_llm = MagicMock()
+        mock_structured = MagicMock()
+        mock_structured.invoke.side_effect = Exception("API timeout")
+        mock_llm.with_structured_output.return_value = mock_structured
+
+        with patch("backend.nodes.planner.get_llm", return_value=mock_llm):
+            with pytest.raises(RuntimeError, match="Planner failed"):
+                plan_search({"query": "AI chips", "mode": "explore"})

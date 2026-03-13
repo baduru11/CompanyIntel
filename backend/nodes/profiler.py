@@ -1,8 +1,12 @@
 # backend/nodes/profiler.py
 from __future__ import annotations
+import logging
 import httpx
+from langchain_core.messages import SystemMessage, HumanMessage
 from backend.models import RawCompanySignal, CompanyProfile
 from backend.config import get_llm
+
+logger = logging.getLogger(__name__)
 
 EXTRACTION_PROMPT = """Extract structured company data from the provided sources.
 Only include information explicitly stated in the source text. Never guess or infer.
@@ -96,11 +100,12 @@ def profile(state: dict) -> dict:
 
         try:
             result = structured_llm.invoke([
-                {"role": "system", "content": EXTRACTION_PROMPT},
-                {"role": "user", "content": f"Extract company profile from:\n\n{combined}"}
+                SystemMessage(content=EXTRACTION_PROMPT),
+                HumanMessage(content=f"Extract company profile from:\n\n{combined}")
             ])
             profiles.append(result)
-        except Exception:
+        except Exception as exc:
+            logger.warning("LLM extraction failed for company=%s: %s", company_key, exc)
             profiles.append(CompanyProfile(
                 name=company_signals[0].company_name,
                 raw_sources=[s.url for s in company_signals],

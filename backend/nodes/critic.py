@@ -1,7 +1,11 @@
 # backend/nodes/critic.py
 from __future__ import annotations
+import logging
+from langchain_core.messages import SystemMessage, HumanMessage
 from backend.config import get_llm
 from backend.models import CriticReport
+
+logger = logging.getLogger(__name__)
 
 CRITIC_SYSTEM = """You are a rigorous fact-checker for competitive intelligence reports.
 You receive a synthesized report AND the raw source data it was built from.
@@ -32,10 +36,14 @@ def critique(state: dict) -> dict:
         for s in raw_signals
     ) if raw_signals else "No raw signals available"
 
-    critic_report = structured_llm.invoke([
-        {"role": "system", "content": CRITIC_SYSTEM},
-        {"role": "user", "content": f"Report:\n{report_text}\n\nRaw sources:\n{raw_text}"}
-    ])
+    try:
+        critic_report = structured_llm.invoke([
+            SystemMessage(content=CRITIC_SYSTEM),
+            HumanMessage(content=f"Report:\n{report_text}\n\nRaw sources:\n{raw_text}")
+        ])
+    except Exception as exc:
+        logger.error("Critic LLM call failed: %s", exc)
+        raise RuntimeError(f"Critic failed: {exc}") from exc
 
     # Enforce max 1 retry
     if retry_count >= 1:

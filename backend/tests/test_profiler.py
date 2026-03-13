@@ -181,3 +181,28 @@ def test_profiler_deep_dive_limits_urls_to_three():
 
     # Should crawl at most 3 URLs even though 5 signals exist
     assert mock_crawl.call_count <= 3
+
+
+class TestProfilerErrorHandling:
+    def test_logs_warning_on_llm_failure(self):
+        """Profiler should log a warning (not crash silently) when LLM extraction fails."""
+        from backend.nodes.profiler import profile
+
+        signals = [_make_signal("Acme Corp", "https://acme.com", "Acme builds widgets")]
+
+        mock_llm = MagicMock()
+        mock_structured = MagicMock()
+        mock_structured.invoke.side_effect = Exception("Parse error")
+        mock_llm.with_structured_output.return_value = mock_structured
+
+        with (
+            patch("backend.nodes.profiler.get_llm", return_value=mock_llm),
+            patch("backend.nodes.profiler.logger") as mock_logger,
+        ):
+            result = profile({"mode": "explore", "raw_signals": signals})
+
+        # Should still return a stub profile (existing behavior)
+        assert len(result["company_profiles"]) == 1
+        assert result["company_profiles"][0].name == "Acme Corp"
+        # But NOW it should also log a warning
+        mock_logger.warning.assert_called_once()

@@ -180,7 +180,7 @@ class TestCriticHappyPath:
             })
 
         call_args = mock_structured.invoke.call_args[0][0]
-        user_msg = call_args[1]["content"]
+        user_msg = call_args[1].content
         # Report content should be in the prompt
         assert "Acme Corp" in user_msg
         # Raw source snippets should be in the prompt
@@ -212,7 +212,7 @@ class TestCriticHappyPath:
             })
 
         call_args = mock_structured.invoke.call_args[0][0]
-        system_msg = call_args[0]["content"]
+        system_msg = call_args[0].content
         assert system_msg == CRITIC_SYSTEM
 
 
@@ -382,7 +382,7 @@ class TestCriticEdgeCases:
         assert isinstance(result["critic_report"], CriticReport)
         # The "No raw signals available" fallback should appear in the prompt
         call_args = mock_structured.invoke.call_args[0][0]
-        user_msg = call_args[1]["content"]
+        user_msg = call_args[1].content
         assert "No raw signals available" in user_msg
 
     def test_critic_handles_string_report(self):
@@ -409,7 +409,7 @@ class TestCriticEdgeCases:
 
         assert "critic_report" in result
         call_args = mock_structured.invoke.call_args[0][0]
-        user_msg = call_args[1]["content"]
+        user_msg = call_args[1].content
         assert "This is a plain text report about Acme Corp." in user_msg
 
     def test_critic_default_retry_count_is_zero(self):
@@ -436,3 +436,20 @@ class TestCriticEdgeCases:
             })
 
         assert result["retry_count"] == 0
+
+
+class TestCriticErrorHandling:
+    def test_raises_descriptive_error_on_llm_failure(self):
+        """Critic should raise a clear error when LLM fails."""
+        from backend.nodes.critic import critique
+
+        mock_llm = MagicMock()
+        mock_structured = MagicMock()
+        mock_structured.invoke.side_effect = Exception("API timeout")
+        mock_llm.with_structured_output.return_value = mock_structured
+
+        report = _make_deep_dive_report()
+
+        with patch("backend.nodes.critic.get_llm", return_value=mock_llm):
+            with pytest.raises(RuntimeError, match="Critic failed"):
+                critique({"report": report, "retry_count": 0})
