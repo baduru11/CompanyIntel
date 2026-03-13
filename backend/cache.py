@@ -2,15 +2,19 @@
 from __future__ import annotations
 import json
 import hashlib
-from datetime import datetime, timezone
+import logging
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 class CacheManager:
-    def __init__(self, base_dir: str = "cache"):
+    def __init__(self, base_dir: str = "cache", report_ttl_days: int = 7):
         self.base_dir = Path(base_dir)
         self.api_dir = self.base_dir / "api"
         self.report_dir = self.base_dir / "reports"
+        self.report_ttl = timedelta(days=report_ttl_days)
         self.api_dir.mkdir(parents=True, exist_ok=True)
         self.report_dir.mkdir(parents=True, exist_ok=True)
 
@@ -23,19 +27,43 @@ class CacheManager:
 
     def get_api(self, provider: str, query: str) -> dict | None:
         path = self.api_dir / f"{provider}_{self._hash_key(provider, query)}.json"
-        if path.exists():
+        if not path.exists():
+            return None
+        try:
             return json.loads(path.read_text(encoding="utf-8"))
-        return None
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.warning("Corrupted API cache file %s: %s", path.name, exc)
+            return None
 
     def set_api(self, provider: str, query: str, data: dict) -> None:
         path = self.api_dir / f"{provider}_{self._hash_key(provider, query)}.json"
-        path.write_text(json.dumps(data, default=str), encoding="utf-8")
+        try:
+            path.write_text(json.dumps(data, default=str), encoding="utf-8")
+        except OSError as exc:
+            logger.warning("Failed to write API cache %s: %s", path.name, exc)
 
     def get_report(self, mode: str, query: str) -> dict | None:
         path = self.report_dir / f"{mode}_{self._hash_key(mode, query)}.json"
-        if path.exists():
-            return json.loads(path.read_text(encoding="utf-8"))
-        return None
+        if not path.exists():
+            return None
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.warning("Corrupted report cache file %s: %s", path.name, exc)
+            return None
+
+        # Check TTL
+        cached_at = data.get("_cached_at")
+        if cached_at:
+            try:
+                cached_time = datetime.fromisoformat(cached_at)
+                if datetime.now(timezone.utc) - cached_time > self.report_ttl:
+                    logger.info("Report cache expired for %s/%s", mode, query)
+                    return None
+            except (ValueError, TypeError):
+                pass  # Can't parse timestamp — treat as valid
+
+        return data
 
     def set_report(self, mode: str, query: str, data: dict) -> None:
         meta = {
@@ -45,29 +73,43 @@ class CacheManager:
             "_query": query,
         }
         path = self.report_dir / f"{mode}_{self._hash_key(mode, query)}.json"
-        path.write_text(json.dumps(meta, default=str), encoding="utf-8")
+        try:
+            path.write_text(json.dumps(meta, default=str), encoding="utf-8")
+        except OSError as exc:
+            logger.warning("Failed to write report cache %s: %s", path.name, exc)
 
     def get_report_by_filename(self, filename: str) -> dict | None:
         path = self.report_dir / filename
-        if path.exists() and path.parent == self.report_dir:
+        if not path.exists() or path.parent != self.report_dir:
+            return None
+        try:
             return json.loads(path.read_text(encoding="utf-8"))
-        return None
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.warning("Failed to read report %s: %s", filename, exc)
+            return None
 
     def delete_report(self, filename: str) -> bool:
         path = self.report_dir / filename
         if path.exists() and path.parent == self.report_dir:
-            path.unlink()
-            return True
+            try:
+                path.unlink()
+                return True
+            except OSError as exc:
+                logger.warning("Failed to delete report %s: %s", filename, exc)
         return False
 
     def list_reports(self) -> list[dict]:
         reports = []
         for path in self.report_dir.glob("*.json"):
-            data = json.loads(path.read_text(encoding="utf-8"))
-            reports.append({
-                "mode": data.get("_mode", "unknown"),
-                "query": data.get("_query", "unknown"),
-                "cached_at": data.get("_cached_at", ""),
-                "filename": path.name,
-            })
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                reports.append({
+                    "mode": data.get("_mode", "unknown"),
+                    "query": data.get("_query", "unknown"),
+                    "cached_at": data.get("_cached_at", ""),
+                    "filename": path.name,
+                })
+            except (json.JSONDecodeError, OSError) as exc:
+                logger.warning("Skipping corrupted cache file %s: %s", path.name, exc)
+                continue
         return sorted(reports, key=lambda r: r["cached_at"], reverse=True)
