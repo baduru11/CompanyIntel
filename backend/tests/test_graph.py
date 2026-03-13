@@ -157,3 +157,42 @@ class TestAgentState:
     def test_agent_state_total_false(self):
         """AgentState should be total=False (all keys optional)."""
         assert AgentState.__total__ is False
+
+
+# ---------------------------------------------------------------------------
+# GraphState accumulation contract tests
+# ---------------------------------------------------------------------------
+
+class TestGraphStateAccumulation:
+    """Document and verify the accumulation contract for AgentState fields.
+
+    - status_events uses Annotated[list, operator.add] so events merge across nodes.
+    - raw_signals is a plain list that replaces on write (fresh results on retry).
+    """
+
+    def test_status_events_accumulate_across_nodes(self):
+        """status_events should use operator.add to merge, not replace."""
+        import operator
+        import typing
+
+        hints = typing.get_type_hints(AgentState, include_extras=True)
+        status_hint = hints.get("status_events")
+        # Verify it has Annotated metadata with operator.add
+        assert hasattr(status_hint, "__metadata__"), "status_events should be Annotated"
+        assert status_hint.__metadata__[0] is operator.add, (
+            "status_events should accumulate with operator.add"
+        )
+
+    def test_raw_signals_replaces_on_retry(self):
+        """raw_signals should NOT accumulate — on retry we want fresh results."""
+        import operator
+        import typing
+
+        hints = typing.get_type_hints(AgentState, include_extras=True)
+        raw_hint = hints.get("raw_signals")
+        # Should NOT have Annotated metadata (plain list, replaces on write)
+        has_metadata = hasattr(raw_hint, "__metadata__")
+        if has_metadata:
+            assert raw_hint.__metadata__[0] is not operator.add, (
+                "raw_signals should replace, not accumulate"
+            )
