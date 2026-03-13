@@ -34,10 +34,31 @@ const SECTION_IDS = {
  * Falls back to the main report confidence.
  */
 function getSectionConfidence(data, sectionKey) {
-  // Try critic per-section scores first
   const critic = data?.critic || data?.critic_report;
-  if (critic?.section_scores?.[sectionKey] != null) {
-    return critic.section_scores[sectionKey];
+  // Map frontend keys to backend critic score keys
+  const keyMap = {
+    people: 'key_people',
+    product: 'product_technology',
+    news: 'recent_news',
+  };
+  const criticKey = keyMap[sectionKey] || sectionKey;
+  if (critic?.section_scores?.[criticKey] != null) {
+    return critic.section_scores[criticKey];
+  }
+  // Also try the section's own confidence
+  const report = data?.report || data || {};
+  const fieldMap = {
+    overview: 'overview',
+    funding: 'funding',
+    people: 'key_people',
+    product: 'product_technology',
+    news: 'recent_news',
+    competitors: 'competitors',
+    red_flags: 'red_flags',
+  };
+  const field = fieldMap[sectionKey];
+  if (field && report[field]?.confidence != null) {
+    return report[field].confidence;
   }
   // Fall back to overall confidence
   return data?.confidence ?? data?.report?.confidence ?? null;
@@ -47,6 +68,23 @@ function getSectionConfidence(data, sectionKey) {
  * Extract source URLs for a given section from the data.
  */
 function getSectionSources(data, sectionKey) {
+  const report = data?.report || data || {};
+  // Map sectionKey to the report field name
+  const fieldMap = {
+    overview: 'overview',
+    funding: 'funding',
+    people: 'key_people',
+    product: 'product_technology',
+    news: 'recent_news',
+    competitors: 'competitors',
+    red_flags: 'red_flags',
+  };
+  const field = fieldMap[sectionKey];
+  const section = field ? report[field] : null;
+  if (section?.source_urls?.length) {
+    return section.source_urls.map((s) => typeof s === "string" ? { url: s } : s);
+  }
+  // Fallback to old path
   const sources = data?.sources || data?.report?.sources || {};
   const sectionSources = sources[sectionKey] || [];
   return sectionSources.map((s) =>
@@ -140,13 +178,31 @@ export default function DeepDiveView({ data, onDownloadPdf }) {
           )}
         </div>
 
+          {/* Low-confidence warning banner */}
+          {(() => {
+            const lowConfSections = navSections.filter(
+              (s) => s.confidence !== null && s.confidence < 0.4
+            );
+            if (lowConfSections.length === 0) return null;
+            return (
+              <div className="mx-4 mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+                <p className="text-sm font-medium text-amber-400">
+                  {lowConfSections.length} section{lowConfSections.length > 1 ? "s" : ""} with low confidence
+                </p>
+                <p className="mt-1 text-xs text-amber-400/70">
+                  {lowConfSections.map((s) => s.title).join(", ")} — data may be incomplete or unverified
+                </p>
+              </div>
+            );
+          })()}
+
         <div className="p-4 space-y-6 max-w-6xl">
           {/* 1. Overview */}
           <ReportSection
             id={SECTION_IDS.overview}
             title="Overview"
             confidence={getSectionConfidence(data, "overview")}
-            sourceCount={getSectionSources(data, "overview").length}
+            sourceCount={report.overview?.source_count || getSectionSources(data, "overview").length}
             sourceUrls={getSectionSources(data, "overview")}
           >
             {description && (
@@ -180,7 +236,7 @@ export default function DeepDiveView({ data, onDownloadPdf }) {
             id={SECTION_IDS.funding}
             title="Funding"
             confidence={getSectionConfidence(data, "funding")}
-            sourceCount={getSectionSources(data, "funding").length}
+            sourceCount={report.funding?.source_count || getSectionSources(data, "funding").length}
             sourceUrls={getSectionSources(data, "funding")}
           >
             {fundingText && (
@@ -196,7 +252,7 @@ export default function DeepDiveView({ data, onDownloadPdf }) {
             id={SECTION_IDS.people}
             title="Key People"
             confidence={getSectionConfidence(data, "people")}
-            sourceCount={getSectionSources(data, "people").length}
+            sourceCount={report.key_people?.source_count || getSectionSources(data, "people").length}
             sourceUrls={getSectionSources(data, "people")}
           >
             {people.length > 0 ? (
@@ -243,7 +299,7 @@ export default function DeepDiveView({ data, onDownloadPdf }) {
             id={SECTION_IDS.product}
             title="Product / Technology"
             confidence={getSectionConfidence(data, "product")}
-            sourceCount={getSectionSources(data, "product").length}
+            sourceCount={report.product_technology?.source_count || getSectionSources(data, "product").length}
             sourceUrls={getSectionSources(data, "product")}
           >
             {productText ? (
@@ -262,7 +318,7 @@ export default function DeepDiveView({ data, onDownloadPdf }) {
             id={SECTION_IDS.news}
             title="Recent News"
             confidence={getSectionConfidence(data, "news")}
-            sourceCount={getSectionSources(data, "news").length}
+            sourceCount={report.recent_news?.source_count || getSectionSources(data, "news").length}
             sourceUrls={getSectionSources(data, "news")}
           >
             {newsItems.length > 0 ? (
@@ -287,7 +343,7 @@ export default function DeepDiveView({ data, onDownloadPdf }) {
             id={SECTION_IDS.competitors}
             title="Competitors"
             confidence={getSectionConfidence(data, "competitors")}
-            sourceCount={getSectionSources(data, "competitors").length}
+            sourceCount={report.competitors?.source_count || getSectionSources(data, "competitors").length}
             sourceUrls={getSectionSources(data, "competitors")}
           >
             {competitors.length > 0 ? (
@@ -308,7 +364,7 @@ export default function DeepDiveView({ data, onDownloadPdf }) {
             id={SECTION_IDS.redFlags}
             title="Red Flags"
             confidence={getSectionConfidence(data, "red_flags")}
-            sourceCount={getSectionSources(data, "red_flags").length}
+            sourceCount={report.red_flags?.source_count || getSectionSources(data, "red_flags").length}
             sourceUrls={getSectionSources(data, "red_flags")}
           >
             {redFlags.length > 0 ? (
