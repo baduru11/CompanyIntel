@@ -27,6 +27,38 @@ def get_tavily_client():
     return TavilyClient(api_key=get_settings().tavily_api_key)
 
 
+def _search_serper(query: str, num_results: int, cache: CacheManager) -> list[RawCompanySignal]:
+    cached = cache.get_api("serper", query)
+    if cached:
+        return [RawCompanySignal(**s) for s in cached]
+
+    import httpx
+
+    try:
+        resp = httpx.post(
+            "https://google.serper.dev/search",
+            headers={"X-API-KEY": get_settings().serper_api_key},
+            json={"q": query, "num": num_results},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        results = resp.json().get("organic", [])[:num_results]
+        signals = [
+            RawCompanySignal(
+                company_name=r.get("title", "Unknown"),
+                url=r.get("link", ""),
+                snippet=r.get("snippet", ""),
+                source="serper",
+            )
+            for r in results
+        ]
+        cache.set_api("serper", query, [s.model_dump() for s in signals])
+        return signals
+    except Exception as exc:
+        logger.warning("Serper search failed for query=%s: %s", query, exc)
+        return []
+
+
 def _search_exa(client, query: str, num_results: int, cache: CacheManager) -> list[RawCompanySignal]:
     cached = cache.get_api("exa", query)
     if cached:
@@ -83,54 +115,58 @@ def search(state: dict) -> dict:
     cache = get_cache()
     signals: list[RawCompanySignal] = []
 
-    if mode == "explore":
-        exa = None
-        try:
-            exa = get_exa_client()
-        except Exception as exc:
-            logger.warning("Failed to create Exa client: %s", exc)
+    # Initialize all available clients
+    exa = None
+    try:
+        exa = get_exa_client()
+    except Exception as exc:
+        logger.warning("Failed to create Exa client: %s", exc)
 
-        tavily = None
-        try:
-            tavily = get_tavily_client()
-        except Exception as exc:
-            logger.warning("Failed to create Tavily client: %s", exc)
+    tavily = None
+    try:
+        tavily = get_tavily_client()
+    except Exception as exc:
+        logger.warning("Failed to create Tavily client: %s", exc)
 
-        # Run Exa and Tavily searches concurrently
-        from concurrent.futures import ThreadPoolExecutor
+    has_serper = bool(get_settings().serper_api_key)
+    num_results = plan.target_company_count if mode == "explore" else 10
 
-        def _run_exa_searches():
-            results = []
-            if exa is not None:
-                for term in plan.search_terms:
-                    results.extend(_search_exa(exa, term, plan.target_company_count, cache))
-            return results
+    # Run all 3 providers concurrently
+    from concurrent.futures import ThreadPoolExecutor
 
-        def _run_tavily_searches():
-            results = []
-            if tavily is not None:
-                for term in plan.search_terms:
-                    results.extend(_search_tavily(tavily, term, cache))
-            return results
+    def _run_exa():
+        results = []
+        if exa is not None:
+            for term in plan.search_terms:
+                results.extend(_search_exa(exa, term, num_results, cache))
+        return results
 
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            exa_future = pool.submit(_run_exa_searches)
-            tavily_future = pool.submit(_run_tavily_searches)
+    def _run_tavily():
+        results = []
+        if tavily is not None:
+            for term in plan.search_terms:
+                results.extend(_search_tavily(tavily, term, cache))
+        return results
 
-            exa_results = exa_future.result()
-            tavily_results = tavily_future.result()
+    def _run_serper():
+        results = []
+        if has_serper:
+            for term in plan.search_terms:
+                results.extend(_search_serper(term, num_results, cache))
+        return results
 
-        signals.extend(exa_results)
-        # Only add Tavily results if Exa didn't find enough
-        if len(signals) < 5:
-            signals.extend(tavily_results)
-    else:
-        try:
-            tavily = get_tavily_client()
-        except Exception as exc:
-            raise RuntimeError(f"Search failed: cannot create Tavily client: {exc}") from exc
-        for term in plan.search_terms:
-            signals.extend(_search_tavily(tavily, term, cache))
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        exa_future = pool.submit(_run_exa)
+        tavily_future = pool.submit(_run_tavily)
+        serper_future = pool.submit(_run_serper)
+
+        exa_results = exa_future.result()
+        tavily_results = tavily_future.result()
+        serper_results = serper_future.result()
+
+    signals.extend(exa_results)
+    signals.extend(tavily_results)
+    signals.extend(serper_results)
 
     if not signals:
         raise RuntimeError("Search failed: no results found from any provider")
@@ -144,5 +180,5 @@ def search(state: dict) -> dict:
             unique.append(s)
 
     # Cap results to avoid excessive LLM calls in profiler
-    max_signals = plan.target_company_count * 2 if mode == "explore" else 30
+    max_signals = plan.target_company_count * 2 if mode == "explore" else 20
     return {"raw_signals": unique[:max_signals]}
