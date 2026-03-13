@@ -55,6 +55,16 @@ class CompanyProfile(BaseModel):
     competitive_advantages: Optional[str] = None
     regulatory_environment: Optional[str] = None
     competitors_mentioned: list[dict] = []
+    # Investment report upgrade fields
+    board_members: list[dict] = []
+    advisors: list[dict] = []
+    partnerships: list[dict] = []
+    key_customers: list[dict] = []
+    acquisitions: list[dict] = []
+    patents: list[dict] = []
+    revenue_estimate: Optional[dict] = None
+    employee_count_history: list[dict] = []
+    operating_status: Optional[str] = None
 
     @model_validator(mode="after")
     def funding_must_have_source(self):
@@ -114,6 +124,9 @@ class FundingRound(BaseModel):
     stage: Optional[str] = None
     amount: Optional[str] = None
     investors: list[str] = []
+    lead_investor: Optional[str] = None
+    pre_money_valuation: Optional[str] = None
+    post_money_valuation: Optional[str] = None
     source_url: Optional[str] = None
 
 
@@ -162,6 +175,82 @@ class RedFlag(BaseModel):
     source_urls: list[str] = []
 
 
+class InvestmentScore(BaseModel):
+    overall: int = Field(ge=0, le=100, default=0)
+    money: int = Field(ge=0, le=25, default=0)
+    market: int = Field(ge=0, le=25, default=0)
+    momentum: int = Field(ge=0, le=25, default=0)
+    management: int = Field(ge=0, le=25, default=0)
+    rationale: str = ""
+
+    @model_validator(mode="after")
+    def enforce_overall_sum(self) -> "InvestmentScore":
+        """Ensure overall == sum of sub-scores. LLMs sometimes get arithmetic wrong."""
+        self.overall = self.money + self.market + self.momentum + self.management
+        return self
+
+
+class BoardMember(BaseModel):
+    name: str
+    role: Optional[str] = None  # "Chair", "Member", "Observer"
+    organization: Optional[str] = None
+    background: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    source_url: Optional[str] = None
+
+
+class Advisor(BaseModel):
+    name: str
+    expertise: Optional[str] = None
+    organization: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    source_url: Optional[str] = None
+
+
+class Partnership(BaseModel):
+    partner_name: str
+    type: Optional[str] = None  # "strategic", "customer", "technology", "distribution"
+    description: Optional[str] = None
+    date: Optional[str] = None
+    source_url: Optional[str] = None
+
+
+class KeyCustomer(BaseModel):
+    name: str
+    description: Optional[str] = None
+    source_url: Optional[str] = None
+
+
+class Acquisition(BaseModel):
+    acquired_company: str
+    date: Optional[str] = None
+    amount: Optional[str] = None
+    rationale: Optional[str] = None
+    source_url: Optional[str] = None
+
+
+class Patent(BaseModel):
+    title: str
+    filing_date: Optional[str] = None
+    status: Optional[str] = None  # "granted", "pending"
+    domain: Optional[str] = None
+    patent_number: Optional[str] = None
+    source_url: Optional[str] = None
+
+
+class RevenueEstimate(BaseModel):
+    range: Optional[str] = None  # "$5M-$10M ARR"
+    growth_rate: Optional[str] = None  # "~50% YoY"
+    source_url: Optional[str] = None
+    confidence: float = Field(ge=0.0, le=1.0, default=0.0)
+
+
+class EmployeeCountPoint(BaseModel):
+    date: str  # "2024-01", "2025-06"
+    count: int
+    source: Optional[str] = None  # "diffbot", "linkedin", "web"
+
+
 class DeepDiveReport(BaseModel):
     query: str
     company_name: str
@@ -172,6 +261,10 @@ class DeepDiveReport(BaseModel):
     linkedin_url: Optional[str] = None
     crunchbase_url: Optional[str] = None
     logo_url: Optional[str] = None
+    operating_status: Optional[str] = None  # "Active", "Acquired", "Closed", "IPO"
+    total_funding: Optional[str] = None
+    investment_score: Optional[InvestmentScore] = None
+    revenue_estimate: Optional[RevenueEstimate] = None
     overview: DeepDiveSection
     funding: DeepDiveSection
     funding_rounds: list[FundingRound] = []
@@ -184,6 +277,16 @@ class DeepDiveReport(BaseModel):
     competitor_entries: list[CompetitorEntry] = []
     red_flags: DeepDiveSection
     red_flag_entries: list[RedFlag] = []
+    # Governance
+    governance: Optional[DeepDiveSection] = None
+    board_members: list[BoardMember] = []
+    advisors: list[Advisor] = []
+    # Traction & activity
+    partnerships: list[Partnership] = []
+    key_customers: list[KeyCustomer] = []
+    acquisitions: list[Acquisition] = []
+    patents: list[Patent] = []
+    employee_count_history: list[EmployeeCountPoint] = []
     # Due diligence sections
     market_opportunity: Optional[DeepDiveSection] = None
     business_model: Optional[DeepDiveSection] = None

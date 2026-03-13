@@ -30,6 +30,8 @@ class Settings:
         self.openrouter_api_key: str = os.getenv("OPENROUTER_API_KEY", "")
         self.llm_provider: str = "openrouter"
         self.llm_model: str = os.getenv("LLM_MODEL", "deepseek/deepseek-v3.2")
+        self.chat_model: str = os.getenv("CHAT_MODEL", "deepseek/deepseek-chat")
+        self.diffbot_api_key: str = os.getenv("DIFFBOT_API_KEY", "")
         self.cache_dir: str = os.getenv("CACHE_DIR", "cache")
         self.langsmith_tracing: bool = os.getenv("LANGCHAIN_TRACING_V2", "").lower() == "true"
 
@@ -44,12 +46,15 @@ def get_llm():
     if not settings.openrouter_api_key:
         raise ValueError("OPENROUTER_API_KEY not set")
     from langchain_openai import ChatOpenAI
+    # NOTE: ChatOpenAI renames max_tokens → max_completion_tokens in the
+    # payload, which OpenRouter doesn't recognise.  Passing it via extra_body
+    # ensures the raw "max_tokens" key reaches the provider.
     return ChatOpenAI(
         model=settings.llm_model,
         api_key=settings.openrouter_api_key,
         base_url="https://openrouter.ai/api/v1",
         temperature=0,
-        max_tokens=16384,
+        extra_body={"max_tokens": 16384},
         request_timeout=300,
     )
 
@@ -60,6 +65,66 @@ def _strip_fences(text: str) -> str:
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\s*", "", text)
         text = re.sub(r"\s*```$", "", text)
+    return text
+
+
+def _repair_truncated_json(text: str) -> str:
+    """Best-effort repair of JSON truncated by token limit.
+
+    Strips any trailing incomplete string/value, then closes open
+    brackets and braces so the JSON can be parsed.
+    """
+    # Remove trailing incomplete string (unmatched quote)
+    # Walk the text to find if we're inside a string
+    in_string = False
+    escape = False
+    last_quote = -1
+    for i, ch in enumerate(text):
+        if escape:
+            escape = False
+            continue
+        if ch == '\\' and in_string:
+            escape = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            if in_string:
+                last_quote = i
+
+    if in_string and last_quote >= 0:
+        # Truncated mid-string — close the string
+        text = text + '"'
+
+    # Remove trailing comma or colon (invalid before closing)
+    text = re.sub(r'[,:\s]+$', '', text)
+
+    # Count open/close brackets and braces
+    opens = []
+    in_str = False
+    esc = False
+    for ch in text:
+        if esc:
+            esc = False
+            continue
+        if ch == '\\' and in_str:
+            esc = True
+            continue
+        if ch == '"':
+            in_str = not in_str
+            continue
+        if in_str:
+            continue
+        if ch in ('{', '['):
+            opens.append(ch)
+        elif ch == '}' and opens and opens[-1] == '{':
+            opens.pop()
+        elif ch == ']' and opens and opens[-1] == '[':
+            opens.pop()
+
+    # Close remaining open brackets/braces in reverse order
+    for bracket in reversed(opens):
+        text += ']' if bracket == '[' else '}'
+
     return text
 
 
@@ -74,9 +139,16 @@ def invoke_structured(llm, schema: type[T], messages: list) -> T:
         structured_llm = llm.with_structured_output(schema)
         return structured_llm.invoke(messages)
     except Exception as first_err:
-        # Check if this is a JSON parsing error (e.g. markdown fences)
-        err_str = str(first_err)
-        if "json" not in err_str.lower() and "invalid" not in err_str.lower():
+        # Check if this is a recoverable parsing error
+        err_str = str(first_err).lower()
+        err_type = type(first_err).__name__.lower()
+        recoverable = (
+            "json" in err_str
+            or "invalid" in err_str
+            or "length" in err_str
+            or "lengthfinishreason" in err_type
+        )
+        if not recoverable:
             raise
 
         logger.warning("Structured output failed, retrying with manual parsing: %s", first_err)
@@ -84,4 +156,10 @@ def invoke_structured(llm, schema: type[T], messages: list) -> T:
         # Fallback: raw invoke + strip fences + parse manually
         response = llm.invoke(messages)
         text = _strip_fences(response.content)
-        return schema.model_validate_json(text)
+        try:
+            return schema.model_validate_json(text)
+        except Exception:
+            # Response may be truncated by token limit — try repair
+            logger.warning("JSON parse failed, attempting truncated JSON repair")
+            repaired = _repair_truncated_json(text)
+            return schema.model_validate_json(repaired)
