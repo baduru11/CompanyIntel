@@ -13,7 +13,7 @@ Output search terms that will find companies, their funding, and key details.
 Include sub-sector categories to organize the landscape."""
 
 DEEP_DIVE_PROMPT = """You are a competitive intelligence research planner for investor due diligence.
-Given a company name, generate 8-10 specific search terms to find comprehensive intelligence.
+Given a company name, generate 14-16 specific search terms to find comprehensive intelligence.
 Include the company name in every search term. Cover these categories:
 
 CORE INTELLIGENCE:
@@ -32,8 +32,24 @@ DUE DILIGENCE:
 - "{company} competitive advantages moat differentiation"
 - "{company} regulatory risks concerns controversies"
 
+GOVERNANCE & PEOPLE:
+- "{company} board of directors advisors board members governance"
+
+CORPORATE ACTIVITY:
+- "{company} acquisitions acquired companies M&A mergers"
+- "{company} partnerships strategic partners customers clients key accounts"
+
+INTELLECTUAL PROPERTY:
+- "{company} patents intellectual property filings inventions"
+
+FINANCIAL ESTIMATES:
+- "{company} revenue ARR annual revenue estimate valuation fundraise"
+
+WORKFORCE:
+- "{company} employee count headcount growth hiring linkedin"
+
 Replace {company} with the actual company name.
-Generate 8-10 search terms. Quality over quantity."""
+Generate 14-16 search terms. Quality over quantity."""
 
 
 def plan_search(state: dict) -> dict:

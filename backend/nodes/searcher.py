@@ -1,7 +1,9 @@
 # backend/nodes/searcher.py
 from __future__ import annotations
 import logging
+import threading
 from backend.models import RawCompanySignal, SearchPlan
+from backend.rag import store_research, make_report_id
 from backend.config import get_settings
 from backend.cache import CacheManager
 
@@ -181,4 +183,18 @@ def search(state: dict) -> dict:
 
     # Cap results to avoid excessive LLM calls in profiler
     max_signals = plan.target_company_count * 2 if mode == "explore" else 20
-    return {"raw_signals": unique[:max_signals]}
+    signals = unique[:max_signals]
+
+    # Async RAG ingestion — non-blocking side effect
+    report_id = make_report_id(state["query"])
+    company_name = state["query"].strip()
+
+    def _ingest():
+        try:
+            store_research(report_id, company_name, signals)
+        except Exception as e:
+            logger.warning(f"RAG ingestion failed: {e}")
+
+    threading.Thread(target=_ingest, daemon=True).start()
+
+    return {"raw_signals": signals, "report_id": report_id}

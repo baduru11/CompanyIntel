@@ -12,7 +12,9 @@ from backend.config import get_llm, invoke_structured
 from backend.models import (
     CompanyProfile, ExploreReport, DeepDiveReport, DeepDiveSection,
     SectionProse, FundingRound, PersonEntry, NewsItem, CompetitorEntry,
-    RedFlag, RiskEntry, Citation,
+    RedFlag, RiskEntry, Citation, InvestmentScore,
+    BoardMember, Advisor, Partnership, KeyCustomer, Acquisition,
+    Patent, RevenueEstimate, EmployeeCountPoint,
 )
 
 logger = logging.getLogger(__name__)
@@ -39,68 +41,84 @@ CITATIONS: For every factual claim, include an inline citation marker like [1], 
 Populate the 'citations' array with corresponding entries: {id, url, snippet}.
 The snippet should be the exact text from the source that supports the claim."""
 
+_SECTION_FORMAT_RULES = """
+FORMAT RULES (apply to every section):
+- Do NOT start with a title, heading, or section name — the UI already displays the section title.
+- Do NOT write an "Executive Summary" or opening preamble like "Based on the provided data...".
+- Do NOT end with a disclaimer, caveat, or "Note:" paragraph about data limitations or due diligence.
+- Jump straight into the substance on the first line. End with the last substantive point.
+- Use markdown: **bold** for key terms, bullet lists, ### subheadings for sub-topics.
+- INLINE CITATIONS: For every factual claim, add an inline citation marker like [1], [2], etc.
+  referring to the source URL where you found the information. These markers must correspond to
+  entries in the citations array extracted separately.
+- CRITICAL: Only use information from the provided data. Never guess or infer."""
+
 # Per-section prompts for parallel synthesis
 _SECTION_PROMPTS = {
-    "overview": """Write a comprehensive overview of this company for investor due diligence.
+    "overview": f"""Write a comprehensive overview of this company for investor due diligence.
 Cover: what the company does, its mission, market position, and key value proposition.
-Write 2-3 substantive paragraphs using markdown formatting (use **bold** for key terms, bullet lists where appropriate).
-CRITICAL: Only use information from the provided data. Never guess.""",
+Write 2-3 substantive paragraphs.
+{_SECTION_FORMAT_RULES}""",
 
-    "funding": """Write a detailed funding history analysis for investor due diligence.
+    "funding": f"""Write a detailed funding history analysis for investor due diligence.
 Cover: total funding raised, funding trajectory, key investors, and what the funding signals about company health.
-Write 2-3 substantive paragraphs using markdown formatting.
-CRITICAL: Only use information from the provided data. Never guess.""",
+Write 2-3 substantive paragraphs.
+{_SECTION_FORMAT_RULES}""",
 
-    "key_people": """Write an analysis of the leadership team for investor due diligence.
+    "key_people": f"""Write an analysis of the leadership team for investor due diligence.
 Cover: key executives, their backgrounds, relevant experience, and team strengths/gaps.
-Write 2-3 substantive paragraphs using markdown formatting.
-CRITICAL: Only use information from the provided data. Never guess.""",
+Write 2-3 substantive paragraphs.
+{_SECTION_FORMAT_RULES}""",
 
-    "product_technology": """Write a product and technology analysis for investor due diligence.
+    "product_technology": f"""Write a product and technology analysis for investor due diligence.
 Cover: core product/platform, technology stack, technical differentiation, and product-market fit signals.
-Structure with markdown: use **bold** for key terms, use bullet points for feature lists, use ### subheadings if covering multiple products.
-CRITICAL: Only use information from the provided data. Never guess.""",
+Use ### subheadings if covering multiple products.
+{_SECTION_FORMAT_RULES}""",
 
-    "market_opportunity": """Write a market opportunity analysis for investor due diligence.
+    "market_opportunity": f"""Write a market opportunity analysis for investor due diligence.
 Cover: TAM/SAM/SOM, market growth trends, market dynamics, and where this company fits.
-Structure with markdown: use **bold** for key metrics, bullet points for market drivers.
-CRITICAL: Only use information from the provided data. If no market data available, say so.""",
+If no market data available, say so briefly.
+{_SECTION_FORMAT_RULES}""",
 
-    "business_model": """Write a business model analysis for investor due diligence.
+    "business_model": f"""Write a business model analysis for investor due diligence.
 Cover: revenue model, pricing strategy, unit economics signals, and monetization approach.
-Structure with markdown: use **bold** for key terms, bullet points for revenue streams.
-CRITICAL: Only use information from the provided data. If no business model data available, say so.""",
+If no business model data available, say so briefly.
+{_SECTION_FORMAT_RULES}""",
 
-    "competitive_advantages": """Write a competitive advantages / moat analysis for investor due diligence.
+    "competitive_advantages": f"""Write a competitive advantages / moat analysis for investor due diligence.
 Cover: IP/patents, network effects, switching costs, data advantages, brand, and regulatory moats.
-Structure with markdown: use **bold** for moat types, bullet points for each advantage.
-CRITICAL: Only use information from the provided data. If no competitive advantage data available, say so.""",
+If no competitive advantage data available, say so briefly.
+{_SECTION_FORMAT_RULES}""",
 
-    "traction": """Write a traction analysis for investor due diligence.
+    "traction": f"""Write a traction analysis for investor due diligence.
 Cover: revenue signals, customer growth, key contracts, adoption metrics, and growth trajectory.
-Structure with markdown: use **bold** for key metrics, bullet points for traction signals.
-CRITICAL: Only use information from the provided data. If no traction data available, say so.""",
+If no traction data available, say so briefly.
+{_SECTION_FORMAT_RULES}""",
 
-    "recent_news": """Write a recent news summary for investor due diligence.
+    "recent_news": f"""Write a recent news summary for investor due diligence.
 Cover: key announcements, partnerships, product launches, and market developments.
-Write 2-3 paragraphs using markdown formatting.
-CRITICAL: Only use information from the provided data. Never guess.""",
+Write 2-3 paragraphs.
+{_SECTION_FORMAT_RULES}""",
 
-    "competitors": """Write a competitive landscape analysis for investor due diligence.
+    "competitors": f"""Write a competitive landscape analysis for investor due diligence.
 Cover: key competitors, how they compare, market positioning, and competitive dynamics.
-Write 2-3 substantive paragraphs using markdown formatting.
-CRITICAL: Only use information from the provided data. Never guess.""",
+Write 2-3 substantive paragraphs.
+{_SECTION_FORMAT_RULES}""",
 
-    "red_flags": """Write a red flags assessment for investor due diligence.
+    "red_flags": f"""Write a red flags assessment for investor due diligence.
 Cover: any concerns, controversies, legal issues, team risks, or market risks identified.
-If no red flags found, state that clearly.
-Write using markdown formatting.
-CRITICAL: Only use information from the provided data. Never guess.""",
+If no red flags found, state that clearly in one sentence — do not pad with generic risk language.
+{_SECTION_FORMAT_RULES}""",
 
-    "risks": """Write a risk assessment for investor due diligence.
+    "risks": f"""Write a risk assessment for investor due diligence.
 Cover: regulatory, market, technology, team, financial, and competitive risks.
-Structure with markdown: use ### subheadings per risk category, bullet points for specific risks.
-CRITICAL: Only use information from the provided data. If limited risk data available, say so.""",
+Use ### subheadings per risk category.
+{_SECTION_FORMAT_RULES}""",
+
+    "governance": f"""Write a governance analysis for investor due diligence.
+Cover: board composition and quality, advisor network, governance structure, and what it signals about company maturity.
+Highlight notable board members' backgrounds, investor representation on the board, and advisor expertise areas.
+{_SECTION_FORMAT_RULES}""",
 }
 
 _METADATA_PROMPT = """Extract metadata and structured arrays from the company profile data.
@@ -113,11 +131,14 @@ METADATA:
 - funding_stage: string
 - linkedin_url: string or null
 - crunchbase_url: string or null
+- operating_status: "Active" | "Acquired" | "Closed" | "IPO" (default "Active" if unclear)
+- total_funding: string (e.g. "$1.2B", "$50M") — total capital raised across all rounds
 
 STRUCTURED ARRAYS (extract directly from profile data):
-- funding_rounds: [{date, stage, amount, investors: [string], source_url}]
+- funding_rounds: [{date, stage, amount, investors: [string], lead_investor: string or null, pre_money_valuation: string or null, post_money_valuation: string or null, source_url}]
   IMPORTANT: Deduplicate funding rounds. If two rounds have the same amount and overlapping investors,
   keep only the one with the more specific date. Never list the same round twice.
+  Include lead_investor separately from the investors list. Include valuations if mentioned.
 - people_entries: [{name, title, background, source_url, linkedin_url, prior_exits: [string], domain_expertise_years: int, notable_affiliations: [string]}]
   IMPORTANT: Always include linkedin_url if found in sources. Search for "linkedin.com/in/" patterns.
 - news_items: [{title, date, source_url, snippet, sentiment: "positive"|"neutral"|"negative"}]
@@ -126,10 +147,57 @@ STRUCTURED ARRAYS (extract directly from profile data):
   IMPORTANT: Include funding amount for each competitor if mentioned in sources.
 - red_flag_entries: [{content, severity: "low"|"medium"|"high", confidence: 0.0-1.0, source_urls: [string]}]
 - risk_entries: [{category: "regulatory"|"market"|"technology"|"team"|"financial"|"competitive", content, severity, confidence, source_urls}]
+- board_members: [{name, role: "Chair"|"Member"|"Observer", organization, background, linkedin_url, source_url}]
+- advisors: [{name, expertise, organization, linkedin_url, source_url}]
+- partnerships: [{partner_name, type: "strategic"|"customer"|"technology"|"distribution", description, date, source_url}]
+- key_customers: [{name, description, source_url}]
+- acquisitions: [{acquired_company, date, amount, rationale, source_url}]
+- patents: [{title, filing_date, status: "granted"|"pending", domain, patent_number, source_url}]
+- revenue_estimate: {range: string, growth_rate: string, source_url: string, confidence: 0.0-1.0} or null
+- employee_count_history: [{date: string, count: int, source: string}]
 - citations: [{id: int, url: string, snippet: string}]
 
 CRITICAL: Only include information from the provided data. Never guess.
 Deduplicate all arrays — same person, same funding round, same news item should appear only once."""
+
+
+_INVESTMENT_SCORE_PROMPT = """You are an investment analyst scoring a private company's investment readiness.
+Based on the provided research data, assign four sub-scores (0-25 each) and an overall score (0-100).
+
+MONEY (0-25): Evaluate financial health signals.
+- Recent funding round (within 18 months = higher)
+- Healthy round progression (Seed → A → B = good trajectory)
+- Reputable investors (well-known VCs = higher)
+- Total funding appropriate for stage
+- Revenue signals present (ARR, growth rate)
+
+MARKET (0-25): Evaluate market positioning.
+- TAM mentioned and sized (larger = higher, but must be credible)
+- Market growth signals present
+- Clear market positioning and differentiation
+- Business model clarity
+- Low regulatory risk
+
+MOMENTUM (0-25): Evaluate growth signals.
+- Positive recent news (partnerships, launches, awards)
+- Hiring / employee growth
+- Partnership activity
+- Recent funding round
+- Customer wins and traction signals
+
+MANAGEMENT (0-25): Evaluate team quality.
+- Founder/executive prior exits
+- Domain expertise (years in industry)
+- Board quality (reputable investors/operators)
+- Advisor network strength
+- Complete leadership (CEO + CTO + key roles filled)
+
+Output:
+- overall: sum of four sub-scores (0-100)
+- money, market, momentum, management: individual scores (0-25 each)
+- rationale: 2-3 sentences explaining the score, highlighting strongest and weakest areas
+
+CRITICAL: Only use information from the provided data. Score conservatively — missing data should lower scores."""
 
 
 class MetadataAndArrays(BaseModel):
@@ -141,6 +209,8 @@ class MetadataAndArrays(BaseModel):
     funding_stage: Optional[str] = None
     linkedin_url: Optional[str] = None
     crunchbase_url: Optional[str] = None
+    operating_status: Optional[str] = None
+    total_funding: Optional[str] = None
     funding_rounds: list[FundingRound] = []
     people_entries: list[PersonEntry] = []
     news_items: list[NewsItem] = []
@@ -148,6 +218,140 @@ class MetadataAndArrays(BaseModel):
     red_flag_entries: list[RedFlag] = []
     risk_entries: list[RiskEntry] = []
     citations: list[Citation] = []
+    board_members: list[BoardMember] = []
+    advisors: list[Advisor] = []
+    partnerships: list[Partnership] = []
+    key_customers: list[KeyCustomer] = []
+    acquisitions: list[Acquisition] = []
+    patents: list[Patent] = []
+    revenue_estimate: Optional[RevenueEstimate] = None
+    employee_count_history: list[EmployeeCountPoint] = []
+
+
+def _merge_profiles_into_meta(meta: MetadataAndArrays, profiles: list[CompanyProfile], company_name: str) -> None:
+    """Fill MetadataAndArrays gaps from already-structured CompanyProfile fields.
+
+    The LLM re-extraction sometimes drops basic info that the profiler already captured.
+    This ensures trivial fields like founded year, headcount, and headquarters survive.
+    """
+    for p in profiles:
+        # Basic metadata — fill only if LLM left it empty
+        if not meta.founded and p.founding_year:
+            month_part = f"{p.founding_month} " if getattr(p, "founding_month", None) else ""
+            meta.founded = f"{month_part}{p.founding_year}"
+        if not meta.headquarters and p.headquarters:
+            meta.headquarters = p.headquarters
+        if not meta.headcount and p.headcount_estimate:
+            meta.headcount = p.headcount_estimate
+        if not meta.funding_stage and p.funding_stage:
+            meta.funding_stage = p.funding_stage
+        if not meta.linkedin_url and p.linkedin_url:
+            meta.linkedin_url = p.linkedin_url
+        if not meta.crunchbase_url and p.crunchbase_url:
+            meta.crunchbase_url = p.crunchbase_url
+        if not meta.total_funding and p.funding_total:
+            meta.total_funding = p.funding_total
+        if not meta.operating_status and getattr(p, "operating_status", None):
+            meta.operating_status = p.operating_status
+        if not meta.company_name or meta.company_name == company_name:
+            if p.name and p.name.strip():
+                meta.company_name = p.name
+
+        # People — merge any profiler-extracted people the LLM missed
+        existing_people = {pe.name.lower().strip() for pe in meta.people_entries}
+        for person in p.key_people:
+            name = person.get("name", "")
+            if name and name.lower().strip() not in existing_people:
+                meta.people_entries.append(PersonEntry(
+                    name=name,
+                    title=person.get("title"),
+                    background=person.get("background"),
+                    linkedin_url=person.get("linkedin_url"),
+                ))
+                existing_people.add(name.lower().strip())
+
+        # Competitors — merge profiler-extracted competitors the LLM missed
+        existing_competitors = {ce.name.lower().strip() for ce in meta.competitor_entries}
+        for comp in p.competitors_mentioned:
+            name = comp.get("name", "")
+            if name and name.lower().strip() not in existing_competitors:
+                meta.competitor_entries.append(CompetitorEntry(
+                    name=name,
+                    description=comp.get("description"),
+                    funding=comp.get("funding"),
+                    funding_stage=comp.get("funding_stage"),
+                    differentiator=comp.get("differentiator"),
+                    overlap=comp.get("overlap"),
+                    website=comp.get("website"),
+                ))
+                existing_competitors.add(name.lower().strip())
+
+        # Board members — merge
+        existing_board = {bm.name.lower().strip() for bm in meta.board_members}
+        for bm in p.board_members:
+            name = bm.get("name", "")
+            if name and name.lower().strip() not in existing_board:
+                meta.board_members.append(BoardMember(
+                    name=name,
+                    role=bm.get("role"),
+                    organization=bm.get("organization"),
+                    background=bm.get("background"),
+                    linkedin_url=bm.get("linkedin_url"),
+                ))
+                existing_board.add(name.lower().strip())
+
+        # Advisors — merge
+        existing_advisors = {a.name.lower().strip() for a in meta.advisors}
+        for adv in p.advisors:
+            name = adv.get("name", "")
+            if name and name.lower().strip() not in existing_advisors:
+                meta.advisors.append(Advisor(
+                    name=name,
+                    expertise=adv.get("expertise"),
+                    organization=adv.get("organization"),
+                    linkedin_url=adv.get("linkedin_url"),
+                ))
+                existing_advisors.add(name.lower().strip())
+
+        # Partnerships — merge
+        existing_partnerships = {pa.partner_name.lower().strip() for pa in meta.partnerships}
+        for part in p.partnerships:
+            name = part.get("partner_name", "")
+            if name and name.lower().strip() not in existing_partnerships:
+                meta.partnerships.append(Partnership(
+                    partner_name=name,
+                    type=part.get("type"),
+                    description=part.get("description"),
+                    date=part.get("date"),
+                ))
+                existing_partnerships.add(name.lower().strip())
+
+        # Acquisitions — merge
+        existing_acquisitions = {a.acquired_company.lower().strip() for a in meta.acquisitions}
+        for acq in p.acquisitions:
+            name = acq.get("acquired_company", "")
+            if name and name.lower().strip() not in existing_acquisitions:
+                meta.acquisitions.append(Acquisition(
+                    acquired_company=name,
+                    date=acq.get("date"),
+                    amount=acq.get("amount"),
+                    rationale=acq.get("rationale"),
+                ))
+                existing_acquisitions.add(name.lower().strip())
+
+        # Patents — merge
+        existing_patents = {pt.title.lower().strip() for pt in meta.patents}
+        for pat in p.patents:
+            title = pat.get("title", "")
+            if title and title.lower().strip() not in existing_patents:
+                meta.patents.append(Patent(
+                    title=title,
+                    filing_date=pat.get("filing_date"),
+                    status=pat.get("status"),
+                    domain=pat.get("domain"),
+                    patent_number=pat.get("patent_number"),
+                ))
+                existing_patents.add(title.lower().strip())
 
 
 def _generate_section(llm, section_key: str, profiles_text: str, company_name: str) -> tuple[str, SectionProse]:
@@ -204,6 +408,10 @@ def synthesize(state: dict) -> dict:
 
     meta.funding_rounds = deduplicate_funding_rounds(meta.funding_rounds)
 
+    # 1b. Fill metadata gaps from already-structured profile fields.
+    # The LLM re-extraction sometimes misses basic info that the profiler already captured.
+    _merge_profiles_into_meta(meta, profiles, company_name)
+
     # 2. Generate logo URL from company website
     logo_url = None
     for p in profiles:
@@ -214,11 +422,42 @@ def synthesize(state: dict) -> dict:
                 logo_url = f"https://logo.clearbit.com/{domain}"
             break
 
-    # 3. Generate all prose sections in parallel
+    # 3. Compute investment score (parallel with sections)
+    investment_score = None
+    try:
+        investment_score = invoke_structured(llm, InvestmentScore, [
+            SystemMessage(content=_INVESTMENT_SCORE_PROMPT),
+            HumanMessage(content=f"Company: {company_name}\n\nCollected data:\n{profiles_text}")
+        ])
+    except Exception as exc:
+        logger.warning("Investment score computation failed: %s", exc)
+
+    # Merge Diffbot employee history from profiles into metadata
+    for p in profiles:
+        if hasattr(p, 'employee_count_history') and p.employee_count_history:
+            for pt in p.employee_count_history:
+                if isinstance(pt, dict):
+                    try:
+                        meta.employee_count_history.append(
+                            EmployeeCountPoint(**pt)
+                        )
+                    except Exception:
+                        pass
+        if hasattr(p, 'revenue_estimate') and p.revenue_estimate and not meta.revenue_estimate:
+            if isinstance(p.revenue_estimate, dict):
+                try:
+                    meta.revenue_estimate = RevenueEstimate(**p.revenue_estimate)
+                except Exception:
+                    pass
+        if hasattr(p, 'operating_status') and p.operating_status and not meta.operating_status:
+            meta.operating_status = p.operating_status
+
+    # 4. Generate all prose sections in parallel
     section_keys = [
         "overview", "funding", "key_people", "product_technology",
         "market_opportunity", "business_model", "competitive_advantages",
         "traction", "recent_news", "competitors", "red_flags", "risks",
+        "governance",
     ]
 
     section_results: dict[str, SectionProse] = {}
@@ -264,6 +503,10 @@ def synthesize(state: dict) -> dict:
         linkedin_url=meta.linkedin_url,
         crunchbase_url=meta.crunchbase_url,
         logo_url=logo_url,
+        operating_status=meta.operating_status,
+        total_funding=meta.total_funding,
+        investment_score=investment_score,
+        revenue_estimate=meta.revenue_estimate,
         overview=_to_section("overview"),
         funding=_to_section("funding"),
         funding_rounds=meta.funding_rounds,
@@ -276,6 +519,14 @@ def synthesize(state: dict) -> dict:
         competitor_entries=meta.competitor_entries,
         red_flags=_to_section("red_flags"),
         red_flag_entries=meta.red_flag_entries,
+        governance=_to_optional_section("governance"),
+        board_members=meta.board_members,
+        advisors=meta.advisors,
+        partnerships=meta.partnerships,
+        key_customers=meta.key_customers,
+        acquisitions=meta.acquisitions,
+        patents=meta.patents,
+        employee_count_history=meta.employee_count_history,
         market_opportunity=_to_optional_section("market_opportunity"),
         business_model=_to_optional_section("business_model"),
         competitive_advantages=_to_optional_section("competitive_advantages"),

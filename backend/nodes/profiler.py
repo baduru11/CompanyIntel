@@ -68,6 +68,44 @@ DUE DILIGENCE FIELDS:
 - competitive_advantages: Moat, IP, patents, network effects, switching costs mentioned
 - regulatory_environment: Any regulatory risks, compliance requirements, or legal issues mentioned
 
+BOARD & GOVERNANCE (board_members): List of dicts with:
+  - "name", "role" ("Chair", "Member", "Observer"), "organization", "background", "linkedin_url"
+  Look for: "board of directors", "advisory board", "board member", "chairperson"
+  Example: [{"name": "John Smith", "role": "Chair", "organization": "Sequoia Capital",
+             "background": "Former CEO of Acme Corp"}]
+
+ADVISORS (advisors): List of dicts with:
+  - "name", "expertise", "organization", "linkedin_url"
+  Look for: "advisor", "advisory board", "strategic advisor"
+
+PARTNERSHIPS & CUSTOMERS:
+- partnerships: List of dicts with "partner_name", "type" ("strategic"/"customer"/"technology"/"distribution"),
+  "description", "date"
+  Look for: "partnership", "strategic alliance", "teamed up with", "integrated with"
+- key_customers: List of dicts with "name", "description"
+  Look for: "customer", "client", "used by", "deployed at", "case study"
+
+ACQUISITIONS (acquisitions): List of dicts with:
+  - "acquired_company", "date", "amount", "rationale"
+  Look for: "acquired", "acquisition", "merger", "M&A", "bought"
+
+PATENTS (patents): List of dicts with:
+  - "title", "filing_date", "status" ("granted"/"pending"), "domain", "patent_number"
+  Look for: "patent", "intellectual property", "IP portfolio", "patent filed"
+
+REVENUE ESTIMATE (revenue_estimate): Dict with:
+  - "range": revenue range string (e.g. "$5M-$10M ARR", "$50M+ revenue")
+  - "growth_rate": growth rate if mentioned (e.g. "~50% YoY", "3x in 2 years")
+
+EMPLOYEE HISTORY (employee_count_history): List of dicts with:
+  - "date" (e.g. "2024-01", "2025"), "count" (integer)
+  Extract any historical headcount mentions with approximate dates.
+  Look for: "employees", "team of", "headcount grew to", "workforce of"
+
+OPERATING STATUS (operating_status):
+  One of: "Active", "Acquired", "Closed", "IPO"
+  Default to "Active" if no evidence of shutdown, acquisition, or IPO.
+
 If a field's data is not in the sources, leave it null or empty. For each factual field
 you populate, set the corresponding source_url field to where you found it."""
 
@@ -124,6 +162,7 @@ def profile(state: dict) -> dict:
         )
 
         extra_content = ""
+        diffbot_data: dict | None = None
         if mode == "deep_dive":
             urls = list({s.url for s in company_signals})[:3]
 
@@ -138,6 +177,13 @@ def profile(state: dict) -> dict:
                     except Exception as exc:
                         logger.warning("Crawl failed for %s: %s", url, exc)
 
+            # Diffbot enrichment (synchronous to avoid event loop conflicts with FastAPI)
+            try:
+                from backend.apis.diffbot import lookup_company_sync
+                diffbot_data = lookup_company_sync(company_signals[0].company_name)
+            except Exception as exc:
+                logger.warning("Diffbot lookup failed for %s: %s", company_key, exc)
+
         combined = f"{snippets}{extra_content}"
 
         try:
@@ -148,6 +194,11 @@ def profile(state: dict) -> dict:
             # LLM may return empty name — fill from signal data
             if not result.name:
                 result.name = company_signals[0].company_name
+
+            # Merge Diffbot data (fill gaps only — don't override LLM-extracted data)
+            if diffbot_data:
+                _merge_diffbot(result, diffbot_data)
+
             profiles.append(result)
         except Exception as exc:
             logger.warning("LLM extraction failed for company=%s: %s", company_key, exc)
@@ -157,3 +208,26 @@ def profile(state: dict) -> dict:
             ))
 
     return {"company_profiles": profiles}
+
+
+def _merge_diffbot(profile: CompanyProfile, diffbot: dict) -> None:
+    """Merge Diffbot data into a CompanyProfile, filling gaps only."""
+    if not profile.description and diffbot.get("description"):
+        profile.description = diffbot["description"]
+    if not profile.headquarters and diffbot.get("headquarters"):
+        profile.headquarters = diffbot["headquarters"]
+    if not profile.website and diffbot.get("website"):
+        profile.website = diffbot["website"]
+    if not profile.founding_year and diffbot.get("founding_year"):
+        profile.founding_year = diffbot["founding_year"]
+    if not profile.headcount_estimate and diffbot.get("headcount_estimate"):
+        profile.headcount_estimate = diffbot["headcount_estimate"]
+    if not profile.operating_status and diffbot.get("operating_status"):
+        profile.operating_status = diffbot["operating_status"]
+    if not profile.sub_sector and diffbot.get("sub_sector"):
+        profile.sub_sector = diffbot["sub_sector"]
+    # Always merge employee history and revenue (additive data)
+    if diffbot.get("employee_count_history"):
+        profile.employee_count_history.extend(diffbot["employee_count_history"])
+    if not profile.revenue_estimate and diffbot.get("revenue_estimate"):
+        profile.revenue_estimate = diffbot["revenue_estimate"]
