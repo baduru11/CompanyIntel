@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { getApiUrl } from "../lib/api";
 
 const STORAGE_KEY = "agentQuery_lastResult";
@@ -32,6 +32,15 @@ export function useAgentQuery() {
   const [isLoading, setIsLoading] = useState(false);
   const [events, setEvents] = useState([]);
 
+  // Suggestion state (Phase 1)
+  const [suggestions, setSuggestions] = useState(null);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+
+  // Abort controller for cancelling in-flight requests
+  const abortRef = useRef(null);
+  // Secondary cancel flag — SSE readers may not throw on abort in all browsers
+  const cancelledRef = useRef(false);
+
   // Persist completed results to localStorage
   useEffect(() => {
     if (result && query) {
@@ -39,48 +48,24 @@ export function useAgentQuery() {
     }
   }, [result, query, mode]);
 
-  const submit = useCallback(async (q, m) => {
-    setQuery(q);
-    setMode(m);
-    setResult(null);
-    setError(null);
+  // Phase 2: run the pipeline with a confirmed query
+  const runPipeline = useCallback(async (q, m) => {
+    // Cancel any previous in-flight request
+    if (abortRef.current) abortRef.current.abort();
+    cancelledRef.current = false;
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setIsLoading(true);
-    setEvents([]);
+    setEvents([{ node: "validation", status: "complete", detail: "Query validated", timestamp: new Date().toISOString() }]);
 
     try {
-      // Tier 3: LLM semantic pre-check (fast feedback, 1 API call)
-      setEvents([{ node: "validation", status: "running", detail: "Validating query...", timestamp: new Date().toISOString() }]);
-      try {
-        const valResp = await fetch(getApiUrl("/api/validate"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query: q }),
-        });
-        if (valResp.ok) {
-          const validation = await valResp.json();
-          if (!validation.is_valid) {
-            setError(
-              validation.reason +
-                (validation.suggestion ? ` ${validation.suggestion}` : "")
-            );
-            setIsLoading(false);
-            return;
-          }
-        }
-        // If /api/validate returns a server error (500), fail-open and proceed
-      } catch {
-        // Network error (server unreachable) — stop here, don't call /api/query
-        setError("Cannot reach the server. Is the backend running?");
-        setIsLoading(false);
-        return;
-      }
-      setEvents((prev) => [...prev, { node: "validation", status: "complete", detail: "Query validated", timestamp: new Date().toISOString() }]);
-
       // POST to check cache — response is either JSON (cache hit) or SSE stream
       const resp = await fetch(getApiUrl("/api/query"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: q, mode: m }),
+        signal: controller.signal,
       });
 
       const contentType = resp.headers.get("content-type") || "";
@@ -88,32 +73,35 @@ export function useAgentQuery() {
       if (contentType.includes("application/json")) {
         const raw = await resp.json();
 
-        // Handle validation errors (422) and other HTTP errors
         if (!resp.ok) {
-          const msg = raw.detail
-            || (raw.message)
-            || `Request failed (${resp.status})`;
+          let msg = raw.detail || raw.message || `Request failed (${resp.status})`;
+          // FastAPI 422 returns detail as array of validation errors
+          if (Array.isArray(msg)) {
+            msg = msg.map((e) => e.msg || e.message || JSON.stringify(e)).join("; ");
+          }
           setError(typeof msg === "string" ? msg : JSON.stringify(msg));
           setIsLoading(false);
           return;
         }
 
-        // Cached result returned directly as JSON
-        // API shape: { cached: true, data: { report: {...}, critic: {...} } }
-        // Normalize to match SSE complete shape: { report: {...}, critic: {...} }
         const normalized = raw.cached && raw.data ? raw.data : raw;
         setResult(normalized);
         setIsLoading(false);
         return;
       }
 
-      // SSE stream via fetch + ReadableStream (POST can't use EventSource)
+      // SSE stream
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let currentEvent = ""; // tracks the "event:" field
+      let currentEvent = "";
 
       while (true) {
+        if (cancelledRef.current) {
+          reader.cancel();
+          break;
+        }
+
         const { done, value } = await reader.read();
         if (done) break;
 
@@ -143,17 +131,98 @@ export function useAgentQuery() {
             } catch {
               // ignore malformed SSE lines
             }
-            currentEvent = ""; // reset after processing data
+            currentEvent = "";
           }
         }
       }
 
-      // If stream ended without a complete/error event, mark as done
-      setIsLoading(false);
+      if (!cancelledRef.current) setIsLoading(false);
     } catch (err) {
+      if (err.name === "AbortError" || cancelledRef.current) return; // cancelled by user
       setError(err.message);
       setIsLoading(false);
     }
+  }, []);
+
+  // Phase 1: submit → suggest → wait for pick (or auto-proceed)
+  const submit = useCallback(async (q, m) => {
+    // Cancel any previous in-flight request
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setQuery(q);
+    setMode(m);
+    setResult(null);
+    setError(null);
+    setSuggestions(null);
+    setIsLoading(false);
+    setEvents([]);
+    setSuggestionsLoading(true);
+
+    try {
+      setEvents([{ node: "validation", status: "running", detail: "Validating query...", timestamp: new Date().toISOString() }]);
+
+      const suggestResp = await fetch(getApiUrl("/api/suggest"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: q, mode: m }),
+        signal: controller.signal,
+      });
+
+      if (!suggestResp.ok) {
+        // Server error on suggest — fail-open, run pipeline directly
+        setSuggestionsLoading(false);
+        await runPipeline(q, m);
+        return;
+      }
+
+      const suggestion = await suggestResp.json();
+
+      if (!suggestion.is_valid) {
+        setError(suggestion.reason || "Invalid query.");
+        setSuggestionsLoading(false);
+        return;
+      }
+
+      // Always show suggestions — even high-confidence queries may have
+      // name collisions (e.g. "Cluely" vs "Cluely Learning")
+      setSuggestions(suggestion);
+      setSuggestionsLoading(false);
+    } catch (err) {
+      if (err.name === "AbortError") return; // cancelled by user
+      setSuggestionsLoading(false);
+      setError("Cannot reach the server. Is the backend running?");
+    }
+  }, [runPipeline]);
+
+  // User picks a suggestion (or original query)
+  const confirmQuery = useCallback(async (selectedQuery) => {
+    setSuggestions(null);
+    setSuggestionsLoading(false);
+    setQuery(selectedQuery);
+    await runPipeline(selectedQuery, mode);
+  }, [mode, runPipeline]);
+
+  const dismissSuggestions = useCallback(() => {
+    setSuggestions(null);
+    setSuggestionsLoading(false);
+  }, []);
+
+  const cancel = useCallback(() => {
+    // Set cancel flag first — SSE loop checks this
+    cancelledRef.current = true;
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+    setIsLoading(false);
+    setSuggestionsLoading(false);
+    setSuggestions(null);
+    setEvents((prev) => [
+      ...prev,
+      { node: "system", status: "complete", detail: "Cancelled by user", timestamp: new Date().toISOString() },
+    ]);
   }, []);
 
   return {
@@ -164,5 +233,10 @@ export function useAgentQuery() {
     isLoading,
     events,
     submit,
+    cancel,
+    suggestions,
+    suggestionsLoading,
+    confirmQuery,
+    dismissSuggestions,
   };
 }
