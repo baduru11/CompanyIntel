@@ -42,6 +42,7 @@ class AgentState(TypedDict, total=False):
     report: Union[ExploreReport, DeepDiveReport]
     critic_report: CriticReport
     retry_count: int
+    retry_targets: list[str]
     status_events: Annotated[list[StatusEvent], operator.add]
 
 

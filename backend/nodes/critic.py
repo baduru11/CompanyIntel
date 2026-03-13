@@ -45,11 +45,23 @@ def critique(state: dict) -> dict:
         logger.error("Critic LLM call failed: %s", exc)
         raise RuntimeError(f"Critic failed: {exc}") from exc
 
-    # Enforce max 1 retry
+    # Derive low_confidence_sections from section_scores if the LLM didn't populate it
+    if not critic_report.low_confidence_sections and critic_report.section_scores:
+        critic_report.low_confidence_sections = [
+            section for section, score in critic_report.section_scores.items()
+            if score < 0.4
+        ]
+
+    # Decide whether to retry based on low-confidence sections
     if retry_count >= 1:
         critic_report.should_retry = False
+    elif len(critic_report.low_confidence_sections) >= 3:
+        critic_report.should_retry = True
+
+    retry_targets = critic_report.low_confidence_sections if critic_report.should_retry else []
 
     return {
         "critic_report": critic_report,
         "retry_count": retry_count + (1 if critic_report.should_retry else 0),
+        "retry_targets": retry_targets,
     }

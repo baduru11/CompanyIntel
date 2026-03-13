@@ -56,7 +56,10 @@ class ExploreCompany(BaseModel):
     sub_sector: str = "Unknown"
     funding_total: Optional[str] = None
     funding_numeric: float = 0.0
+    funding_stage: Optional[str] = None
     founding_year: Optional[int] = None
+    headquarters: Optional[str] = None
+    key_investors: list[str] = []
     description: Optional[str] = None
     confidence: float = Field(ge=0.0, le=1.0, default=0.0)
     source_count: int = 0
@@ -150,6 +153,7 @@ class CriticReport(BaseModel):
     gaps: list[str] = []
     should_retry: bool = False
     retry_queries: list[str] = []
+    low_confidence_sections: list[str] = []
 
 
 class StatusEvent(BaseModel):

@@ -74,6 +74,10 @@ def _search_tavily(client, query: str, cache: CacheManager) -> list[RawCompanySi
 
 
 def search(state: dict) -> dict:
+    retry_targets = state.get("retry_targets", [])
+    if retry_targets:
+        logger.info("Targeted retry for sections: %s", retry_targets)
+
     plan: SearchPlan = state["search_plan"]
     mode = state["mode"]
     cache = get_cache()

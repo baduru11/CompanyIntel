@@ -35,9 +35,13 @@ def plan_search(state: dict) -> dict:
     prompt = EXPLORE_PROMPT if mode == "explore" else DEEP_DIVE_PROMPT
 
     retry_context = ""
-    if state.get("retry_count", 0) > 0 and state.get("critic_report"):
-        gaps = state["critic_report"].gaps
-        retry_context = f"\n\nPrevious search had gaps: {', '.join(gaps)}. Focus on filling these."
+    if state.get("retry_count", 0) > 0:
+        targets = state.get("retry_targets", [])
+        if targets:
+            retry_context = f"\n\nPrevious search had low confidence in these sections: {', '.join(targets)}. Generate search terms specifically targeting these topics."
+        elif state.get("critic_report"):
+            gaps = state["critic_report"].gaps
+            retry_context = f"\n\nPrevious search had gaps: {', '.join(gaps)}. Focus on filling these."
 
     try:
         plan = structured_llm.invoke([

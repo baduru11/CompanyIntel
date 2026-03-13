@@ -150,7 +150,7 @@ class TestAgentState:
         expected_keys = {
             "query", "mode", "search_plan", "raw_signals",
             "company_profiles", "report", "critic_report",
-            "retry_count", "status_events",
+            "retry_count", "retry_targets", "status_events",
         }
         assert expected_keys == set(AgentState.__annotations__.keys())
 
@@ -196,3 +196,23 @@ class TestGraphStateAccumulation:
             assert raw_hint.__metadata__[0] is not operator.add, (
                 "raw_signals should replace, not accumulate"
             )
+
+
+class TestTargetedRetry:
+    def test_should_retry_uses_low_confidence_sections(self):
+        """should_retry returns 'searcher' when low_confidence_sections is non-empty."""
+        from backend.graph import should_retry
+        mock_critic = MagicMock()
+        mock_critic.should_retry = True
+        mock_critic.low_confidence_sections = ["funding", "key_people"]
+        state = {"critic_report": mock_critic, "retry_count": 0}
+        assert should_retry(state) == "searcher"
+
+    def test_should_retry_ends_when_no_low_confidence(self):
+        """should_retry returns 'end' when low_confidence_sections is empty."""
+        from backend.graph import should_retry
+        mock_critic = MagicMock()
+        mock_critic.should_retry = False
+        mock_critic.low_confidence_sections = []
+        state = {"critic_report": mock_critic, "retry_count": 0}
+        assert should_retry(state) == "end"

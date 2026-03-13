@@ -453,3 +453,46 @@ class TestCriticErrorHandling:
         with patch("backend.nodes.critic.get_llm", return_value=mock_llm):
             with pytest.raises(RuntimeError, match="Critic failed"):
                 critique({"report": report, "retry_count": 0})
+
+
+class TestCriticTargetedRetry:
+    def test_populates_low_confidence_sections(self):
+        """Critic should list sections with confidence < 0.4."""
+        from backend.models import CriticReport
+        critic_report = CriticReport(
+            overall_confidence=0.5,
+            section_scores={
+                "overview": 0.8,
+                "funding": 0.3,
+                "key_people": 0.2,
+                "product_technology": 0.7,
+                "recent_news": 0.6,
+                "competitors": 0.35,
+                "red_flags": 0.5,
+            },
+            verifications=[],
+            gaps=["funding details", "leadership team"],
+            should_retry=False,
+            low_confidence_sections=["funding", "key_people", "competitors"],
+        )
+        assert critic_report.low_confidence_sections == ["funding", "key_people", "competitors"]
+
+    def test_should_retry_true_when_low_confidence_sections_exist(self):
+        """should_retry should be True when 3+ sections are below 0.4."""
+        from backend.models import CriticReport
+        report = CriticReport(
+            overall_confidence=0.4,
+            section_scores={
+                "overview": 0.8,
+                "funding": 0.2,
+                "key_people": 0.3,
+                "product_technology": 0.3,
+                "recent_news": 0.6,
+                "competitors": 0.5,
+                "red_flags": 0.5,
+            },
+            low_confidence_sections=["funding", "key_people", "product_technology"],
+            should_retry=True,
+        )
+        assert report.should_retry is True
+        assert len(report.low_confidence_sections) == 3
