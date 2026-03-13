@@ -23,25 +23,30 @@
 
 ---
 
-CompanyIntel is a full-stack competitive intelligence platform that uses a LangGraph-orchestrated AI agent pipeline to research private companies and market sectors. It surfaces sourced, confidence-scored intelligence through a Bloomberg Terminal-inspired dark UI with interactive visualizations.
+CompanyIntel is a full-stack competitive intelligence platform that uses a LangGraph-orchestrated AI agent pipeline to research private companies and market sectors. It surfaces sourced, confidence-scored intelligence through a Bloomberg Terminal-inspired dark UI with interactive visualizations, scroll-spy investment reports, and RAG-powered chat.
 
 ## Features
 
 **Explore Mode** — Enter a sector (e.g. *"AI inference chips"*) and get back 10-20 companies mapped on an interactive force-directed graph with funding stages, sub-sectors, and sortable metrics.
 
-**Deep Dive Mode** — Enter a company name and receive a comprehensive intelligence report: funding history, key people, recent news with sentiment analysis, competitor landscape, red flags, and per-section confidence scores.
+**Deep Dive Mode** — Enter a company name and receive a comprehensive investment report on a single scrollable page with a scroll-spy sidebar: Overview (investment score gauge + key metrics), Financials (funding chart + revenue estimate), Team (key people + board & advisors), Product & Market (technology analysis + patent portfolio), Traction (employee growth + partnerships + acquisitions + news), and Risk (competitor landscape + red flags).
+
+**Research Chat (RAG)** — Ask follow-up questions about any report via a context-aware chat panel. Research data is automatically chunked and indexed into ChromaDB (with `all-MiniLM-L6-v2` embeddings) during the search phase. At chat time, relevant chunks are retrieved via cosine similarity, injected into the LLM context, and the response streams back via SSE. If RAG retrieval is weak (< 3 good results above distance threshold), the system falls back to a live Tavily web search for grounding. Scope to the current report or search across all indexed reports.
 
 **History Dashboard** — Browse, revisit, and manage all past research from the landing page. Export any deep dive report to PDF with one click.
 
 ### Highlights
 
 - **Real-time streaming** — Watch the agent work step-by-step via Server-Sent Events with a live progress bar and collapsible agent log
+- **Investment Score** — 4-axis framework (Money / Market / Momentum / Management, 0-25 each) producing a 0-100 overall investment readiness score with animated SVG gauge
 - **Three-layer anti-hallucination defense** — Source-grounded synthesis prompts + Pydantic validators + independent Critic node that fact-checks every claim against raw sources
-- **Confidence scoring** — Every data point carries a green/yellow/red confidence badge (0.0–1.0) so you know what's verified vs. uncertain
+- **Confidence scoring** — Every data point carries a green/yellow/red confidence badge (0.0-1.0) so you know what's verified vs. uncertain
+- **Two-phase query validation** — Rule-based heuristics + LLM semantic check with smart query suggestions before committing API credits
 - **Offline demo mode** — 5 pre-built fixture datasets work instantly with zero API keys
 - **Two-level caching** — API call cache + report cache eliminates redundant requests and serves repeat queries instantly
-- **Multi-LLM support** — Switch between Gemini, GPT-4o, Claude, or DeepSeek with a single environment variable
+- **Multi-LLM support** — All LLM calls go through OpenRouter; switch models (DeepSeek, GPT-4o, Claude, Gemini, etc.) with a single `LLM_MODEL` environment variable
 - **PDF export** — Client-side report export via html2pdf.js
+- **Diffbot enrichment** — Optional Diffbot Knowledge Graph integration fills data gaps (headcount, revenue, founding year, operating status)
 
 ## Demo
 
@@ -59,29 +64,28 @@ Try these queries with no API keys required:
 
 ### Agent Pipeline
 
-Both modes use the same 5-node LangGraph topology:
+Both modes use the same 5-node linear LangGraph pipeline (no retries):
 
 ```
 START → Planner → Searcher → Profiler → Synthesis → Critic → END
-                     ↑                                  |
-                     └──────── (max 1 retry) ───────────┘
 ```
 
 | Node | Responsibility |
 |------|---------------|
-| **Planner** | Generates a structured `SearchPlan` — search terms, target company count, sub-sector breakdown |
-| **Searcher** | Explore: Exa semantic discovery + Tavily fallback. Deep Dive: Tavily news/funding/press search |
-| **Profiler** | Explore: LLM extraction from snippets. Deep Dive: Crawl4AI → Jina Reader → snippet fallback |
-| **Synthesis** | Source-grounded LLM report generation with Pydantic structured output |
-| **Critic** | Fact-checks claims against raw sources, assigns per-section confidence scores, triggers retry if needed |
+| **Planner** | Generates a structured `SearchPlan` — 14-16 search terms covering funding, governance, patents, partnerships, revenue, workforce |
+| **Searcher** | Parallel search across Exa (semantic discovery) + Tavily (web search) + Serper (Google search), deduplicated. Async RAG ingest into ChromaDB for chat. |
+| **Profiler** | Explore: LLM extraction from snippets. Deep Dive: Crawl4AI → Jina Reader → snippet fallback + optional Diffbot KG enrichment |
+| **Synthesis** | Parallel per-section LLM generation with Pydantic structured output. Computes Investment Score (4-axis). Extracts structured arrays (funding rounds, board members, patents, acquisitions, etc.) |
+| **Critic** | Fact-checks claims against raw source snippets, assigns per-section confidence scores (0.0-1.0) |
 
 ### Tech Stack
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  Frontend                                               │
-│  React 19 · Tailwind CSS 4 · shadcn/ui · Vite 7        │
-│  react-force-graph-2d · Recharts · html2pdf.js          │
+│  React 19 · Tailwind CSS 4 · Radix UI · Vite 7         │
+│  react-force-graph-2d · Recharts · react-markdown       │
+│  html2pdf.js · Lucide React                             │
 ├─────────────────────────────────────────────────────────┤
 │  Backend                                                │
 │  Python 3.12 · FastAPI · LangGraph 0.4                  │
@@ -89,11 +93,15 @@ START → Planner → Searcher → Profiler → Synthesis → Critic → END
 ├─────────────────────────────────────────────────────────┤
 │  Search & Extraction                                    │
 │  Tavily (web search) · Exa (semantic discovery)         │
-│  Crawl4AI (page extraction) · Jina Reader (fallback)    │
+│  Serper (Google search) · Crawl4AI (page extraction)    │
+│  Jina Reader (fallback) · Diffbot KG (enrichment)       │
 ├─────────────────────────────────────────────────────────┤
-│  LLM Providers                                          │
-│  Gemini 2.5 Flash (default) · GPT-4o-mini · Claude      │
-│  DeepSeek via OpenRouter                                │
+│  RAG & Chat                                             │
+│  ChromaDB (vector store) · SentenceTransformers         │
+│  (all-MiniLM-L6-v2 embeddings)                          │
+├─────────────────────────────────────────────────────────┤
+│  LLM (OpenRouter only)                                  │
+│  Any OpenRouter model — default: DeepSeek v3.2          │
 ├─────────────────────────────────────────────────────────┤
 │  Deploy                                                 │
 │  Frontend → Vercel · Backend → Railway (Docker)         │
@@ -102,11 +110,10 @@ START → Planner → Searcher → Profiler → Synthesis → Critic → END
 
 ### Query Validation
 
-Three-tier validation prevents wasted API calls:
+Two-phase validation prevents wasted API calls:
 
-1. **Client-side (instant)** — Length, character, and keyboard-mash heuristics
-2. **Server-side (instant)** — Same rule-based checks in the API layer
-3. **LLM semantic (~1s)** — Single LLM call verifies business relevance; fail-open on errors
+1. **Rule-based (instant)** — Length (3-200 chars), character composition, keyboard-mash heuristics (repeated chars, consonant runs), runs on both client and server
+2. **LLM semantic (~1s)** — Single LLM call via `/api/suggest` verifies business relevance and returns refined query suggestions; fail-open on errors. Auto-proceeds if confidence >= 0.9.
 
 ## Getting Started
 
@@ -134,7 +141,7 @@ cp .env.example .env
 # Edit .env with your API keys (optional for demo mode)
 
 # Start the server
-uvicorn main:app --reload --port 8000
+uvicorn backend.main:app --reload --port 8000
 ```
 
 ### Frontend
@@ -159,14 +166,15 @@ Open [http://localhost:5173](http://localhost:5173) and try any of the demo quer
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `GEMINI_API_KEY` | For live queries | — | Google Gemini API key |
+| `OPENROUTER_API_KEY` | For live queries | — | OpenRouter API key (provides access to DeepSeek, GPT-4o, Claude, etc.) |
+| `LLM_MODEL` | No | `deepseek/deepseek-v3.2` | OpenRouter model ID for research pipeline |
+| `CHAT_MODEL` | No | `deepseek/deepseek-chat` | OpenRouter model ID for RAG chat |
 | `TAVILY_API_KEY` | For live queries | — | Tavily web search API key |
 | `EXA_API_KEY` | For live queries | — | Exa semantic search API key |
-| `OPENAI_API_KEY` | No | — | OpenAI API key (alternative LLM) |
-| `ANTHROPIC_API_KEY` | No | — | Anthropic API key (alternative LLM) |
-| `OPENROUTER_API_KEY` | No | — | OpenRouter API key (DeepSeek, etc.) |
-| `LLM_PROVIDER` | No | `gemini` | LLM provider: `gemini` / `openai` / `anthropic` / `openrouter` |
+| `SERPER_API_KEY` | For live queries | — | Serper Google search API key |
+| `DIFFBOT_API_KEY` | No | — | Diffbot Knowledge Graph API key (optional enrichment) |
 | `CACHE_DIR` | No | `cache` | Path to cache directory |
+| `LANGCHAIN_TRACING_V2` | No | `false` | Enable LangSmith observability |
 
 #### Frontend (`frontend/.env`)
 
@@ -183,9 +191,12 @@ Open [http://localhost:5173](http://localhost:5173) and try any of the demo quer
 | `GET` | `/health` | Health check |
 | `POST` | `/api/query` | Run explore or deep dive — returns JSON (cached) or SSE stream (live) |
 | `POST` | `/api/validate` | Pre-flight query validation (rule-based + LLM semantic) |
+| `POST` | `/api/suggest` | Validate + suggest refined queries in one step |
 | `GET` | `/api/history` | List all cached reports (newest first) |
 | `GET` | `/api/report/{filename}` | Retrieve a specific cached report |
 | `DELETE` | `/api/report/{filename}` | Delete a cached report |
+| `POST` | `/api/chat` | RAG-powered chat over research data (SSE stream) |
+| `GET` | `/api/chat/status` | Count of indexed reports for scope toggle UI |
 
 ### Query Request
 
@@ -197,14 +208,26 @@ POST /api/query
 }
 ```
 
+### Chat Request
+
+```json
+POST /api/chat
+{
+  "message": "What is their main competitive advantage?",
+  "report_id": "abc123",
+  "company_name": "Nvidia",
+  "scope": "current"          // "current" or "all"
+}
+```
+
 ### SSE Events
 
 | Event | Payload | Description |
 |-------|---------|-------------|
 | `status` | `{"node": "searcher", "status": "running", "detail": "..."}` | Pipeline node progress |
+| `section` | `{"section": "funding", "content": {...}}` | Report section as it completes |
 | `complete` | `{"report": {...}, "critic": {...}, "query": "...", "mode": "..."}` | Final result |
 | `error` | `{"error": "..."}` | Error message |
-| `heartbeat` | — | Keep-alive ping (every 15s) |
 
 ## Deployment
 
@@ -233,18 +256,22 @@ The Dockerfile installs Playwright + Chromium for Crawl4AI page extraction.
 ```
 ├── backend/
 │   ├── main.py                 # FastAPI app — endpoints + SSE streaming
-│   ├── models.py               # Pydantic schemas (reports, profiles, plans)
+│   ├── models.py               # Pydantic schemas (reports, profiles, scores)
 │   ├── config.py               # Settings + LLM provider factory
 │   ├── graph.py                # LangGraph state graph definitions
 │   ├── cache.py                # Two-level caching (API calls + reports)
-│   ├── streaming.py            # SSE helpers + heartbeat
-│   ├── validation.py           # Three-tier query validation
+│   ├── validation.py           # Query validation (rule-based + LLM semantic)
+│   ├── rag.py                  # ChromaDB RAG — indexing + retrieval for chat
+│   ├── utils.py                # Deduplication utilities
 │   ├── nodes/
 │   │   ├── planner.py          # Search plan generation
-│   │   ├── searcher.py         # Exa + Tavily web search
-│   │   ├── profiler.py         # Crawl4AI + Jina page extraction
-│   │   ├── synthesis.py        # Source-grounded report generation
-│   │   └── critic.py           # Fact-checking + confidence scoring
+│   │   ├── searcher.py         # Exa + Tavily + Serper parallel search
+│   │   ├── profiler.py         # Crawl4AI + Jina + Diffbot extraction
+│   │   ├── synthesis.py        # Parallel section synthesis + investment scoring
+│   │   ├── critic.py           # Fact-checking + confidence scoring
+│   │   └── chat.py             # RAG chat response generation
+│   ├── apis/
+│   │   └── diffbot.py          # Diffbot Knowledge Graph API client
 │   ├── fixtures/               # 5 demo datasets (no API keys needed)
 │   ├── tests/                  # pytest suite (unit + integration)
 │   ├── Dockerfile
@@ -255,14 +282,29 @@ The Dockerfile installs Playwright + Chromium for Crawl4AI page extraction.
 │   │   ├── components/
 │   │   │   ├── layout/         # TopBar, ProgressBar, StepIndicator, AgentLog
 │   │   │   ├── explore/        # ForceGraph, CompanySidebar, FilterChips
-│   │   │   ├── deep-dive/      # DeepDiveView, SectionNav, FundingChart, ...
+│   │   │   ├── deep-dive/      # Single-page scroll-spy report + 13 sub-components
+│   │   │   │   ├── DeepDiveView.jsx        # Scroll-spy report shell + sidebar nav
+│   │   │   │   ├── InvestmentScoreCard.jsx # SVG gauge + 4-axis bars
+│   │   │   │   ├── FundingChart.jsx        # Area chart + rounds table
+│   │   │   │   ├── RevenueCard.jsx         # Revenue estimate + growth
+│   │   │   │   ├── BoardCard.jsx           # Board members + advisors
+│   │   │   │   ├── EmployeeChart.jsx       # Headcount line chart
+│   │   │   │   ├── PartnershipCard.jsx     # Partnership cards
+│   │   │   │   ├── AcquisitionCard.jsx     # M&A timeline
+│   │   │   │   ├── PatentTable.jsx         # Patent portfolio table
+│   │   │   │   ├── CompetitorTable.jsx     # Competitor matrix
+│   │   │   │   ├── RedFlagCard.jsx         # Risk severity cards
+│   │   │   │   ├── NewsCard.jsx            # News + sentiment
+│   │   │   │   └── ReportSection.jsx       # Markdown section wrapper
+│   │   │   ├── chat/           # ChatPanel, ChatInput, ChatMessage, ScopeToggle
 │   │   │   ├── history/        # HistoryGrid, HistoryCard
-│   │   │   └── shared/         # PDFExport, SourcePopover, badges
-│   │   ├── hooks/              # useAgentQuery, useSSE
-│   │   └── lib/                # API client, utilities
+│   │   │   ├── shared/         # PDFExport, SourcePopover, MarkdownProse, LinkedInIcon, badges
+│   │   │   └── ui/             # Radix-based primitives (Button, Card, Tabs, Tooltip, ...)
+│   │   ├── hooks/              # useAgentQuery (two-phase SSE), useChatStream
+│   │   └── lib/                # API client, PDF export utilities
 │   ├── vercel.json
 │   └── package.json
-├── docs/plans/                 # Design document + implementation plan
+├── docs/plans/                 # Design documents + implementation plans
 └── railway.toml
 ```
 
@@ -284,12 +326,14 @@ All tests run offline — no external API calls. Fixtures and mocks are used thr
 
 ## API Credit Economics
 
-| Query Type | Tavily | Exa | Estimated Cost |
-|------------|--------|-----|----------------|
-| Explore (15 companies) | ~15 credits | 1 credit | ~16 credits |
-| Deep Dive (1 company) | ~5 credits | 0 | ~5 credits |
+| Query Type | Tavily | Exa | Serper | Estimated Cost |
+|------------|--------|-----|--------|----------------|
+| Explore (15 companies) | ~15 credits | 1 credit | ~15 credits | ~31 credits |
+| Deep Dive (1 company) | ~5 credits | 0 | ~5 credits | ~10 credits |
 
-With 1,000 Tavily credits/month (free tier): ~50 explore queries or ~200 deep dives. Caching reduces repeat queries to zero cost. Crawl4AI and Jina Reader are free and unlimited.
+**LLM costs** (via OpenRouter, DeepSeek v3.2): ~$0.14/1M input tokens, ~$0.28/1M output tokens. An explore query costs ~$0.002; a deep dive ~$0.005.
+
+With 1,000 Tavily credits/month (free tier): ~30 explore queries or ~100 deep dives. Caching reduces repeat queries to zero cost. Crawl4AI, Jina Reader, and Diffbot (10K credits/month free tier) are free or very low cost.
 
 ## License
 
