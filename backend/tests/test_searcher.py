@@ -178,3 +178,48 @@ def test_searcher_uses_cache():
     # The actual API should NOT have been called since cache was hit
     mock_tavily.search.assert_not_called()
     mock_exa_factory.assert_not_called()
+
+
+class TestSearcherTimeoutHandling:
+    """Verify API timeouts are handled gracefully (return empty, don't crash)."""
+
+    def test_exa_timeout_returns_empty(self):
+        from backend.nodes.searcher import _search_exa
+
+        mock_exa = MagicMock()
+        mock_exa.search.side_effect = TimeoutError("Exa timed out")
+        mock_cache = MagicMock()
+        mock_cache.get_api.return_value = None
+
+        result = _search_exa(mock_exa, "AI chips", 10, mock_cache)
+        assert result == []
+
+    def test_tavily_timeout_returns_empty(self):
+        from backend.nodes.searcher import _search_tavily
+
+        mock_tavily = MagicMock()
+        mock_tavily.search.side_effect = TimeoutError("Tavily timed out")
+        mock_cache = MagicMock()
+        mock_cache.get_api.return_value = None
+
+        result = _search_tavily(mock_tavily, "AI chips", mock_cache)
+        assert result == []
+
+    def test_search_raises_when_all_providers_fail(self):
+        from backend.nodes.searcher import search
+
+        plan = SearchPlan(search_terms=["test"], target_company_count=10)
+        mock_exa = MagicMock()
+        mock_exa.search.side_effect = TimeoutError("down")
+        mock_tavily = MagicMock()
+        mock_tavily.search.side_effect = TimeoutError("down")
+        mock_cache = MagicMock()
+        mock_cache.get_api.return_value = None
+
+        with (
+            patch("backend.nodes.searcher.get_exa_client", return_value=mock_exa),
+            patch("backend.nodes.searcher.get_tavily_client", return_value=mock_tavily),
+            patch("backend.nodes.searcher.get_cache", return_value=mock_cache),
+        ):
+            with pytest.raises(RuntimeError, match="no results found"):
+                search({"search_plan": plan, "mode": "explore"})
