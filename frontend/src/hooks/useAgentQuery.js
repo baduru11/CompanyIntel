@@ -129,7 +129,9 @@ export function useAgentQuery() {
               const data = JSON.parse(line.slice(5).trim());
               const eventType = currentEvent || data.event || "";
 
-              if (eventType === "status") {
+              if (eventType === "section") {
+                setEvents((prev) => [...prev, { ...data, type: "section", timestamp: new Date().toISOString() }]);
+              } else if (eventType === "status") {
                 setEvents((prev) => [...prev, { ...data, timestamp: data.timestamp || new Date().toISOString() }]);
               } else if (eventType === "complete") {
                 setResult(data);

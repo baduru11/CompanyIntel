@@ -280,6 +280,19 @@ async def query(req: QueryRequest):
                         event="status",
                     )
 
+                    # After synthesis completes, stream report sections
+                    if node_name == "synthesis" and isinstance(output, dict) and "report" in output:
+                        report_obj = output["report"]
+                        if hasattr(report_obj, "model_dump"):
+                            report_dict = report_obj.model_dump()
+                            # Stream each top-level section as it "appears"
+                            for key in ["overview", "funding", "key_people", "product_technology", "recent_news", "competitors", "red_flags"]:
+                                if key in report_dict and report_dict[key]:
+                                    yield ServerSentEvent(
+                                        data=json.dumps({"section": key, "content": report_dict[key]}),
+                                        event="section",
+                                    )
+
                     # Emit "running" for the next node in the pipeline
                     try:
                         idx = NODE_ORDER.index(node_name)
