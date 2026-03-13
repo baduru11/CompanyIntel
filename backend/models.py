@@ -71,6 +71,7 @@ class ExploreReport(BaseModel):
     companies: list[ExploreCompany]
     sub_sectors: list[str]
     summary: str
+    citations: list[Citation] = []
 
 
 class DeepDiveSection(BaseModel):
@@ -137,6 +138,7 @@ class DeepDiveReport(BaseModel):
     competitor_entries: list[CompetitorEntry] = []
     red_flags: DeepDiveSection
     red_flag_entries: list[RedFlag] = []
+    citations: list[Citation] = []
 
 
 class CriticVerification(BaseModel):
@@ -160,3 +162,10 @@ class StatusEvent(BaseModel):
     node: str
     status: Literal["running", "complete", "error", "retrying"]
     detail: str
+
+
+class Citation(BaseModel):
+    id: int
+    url: str
+    snippet: str = ""
+    extracted_at: Optional[str] = None

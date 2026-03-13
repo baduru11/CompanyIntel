@@ -23,7 +23,11 @@ INPUT FIELD MAPPING — populate each company with:
 - confidence: 0.0-1.0 based on source coverage
 - source_count: number of sources used
 
-CRITICAL: Only include information from the provided data. Write 'Data not available' for missing fields. Never guess."""
+CRITICAL: Only include information from the provided data. Write 'Data not available' for missing fields. Never guess.
+
+CITATIONS: For every factual claim, include an inline citation marker like [1], [2], etc.
+Populate the 'citations' array with corresponding entries: {id, url, snippet}.
+The snippet should be the exact text from the source that supports the claim."""
 
 DEEP_DIVE_SYSTEM = """You are a competitive intelligence analyst. Given company profile data,
 create a detailed intelligence report.
@@ -60,7 +64,12 @@ STRUCTURED ARRAYS (populate alongside the prose sections):
 - red_flag_entries: list of {content, severity (low/medium/high), confidence, source_urls}
 
 CRITICAL: Only include information from the provided data. If data is missing, explicitly
-state 'Data not available' in that section. Never infer, guess, or use your own knowledge."""
+state 'Data not available' in that section. Never infer, guess, or use your own knowledge.
+
+CITATIONS: For every factual claim in section content, include inline citation markers [1], [2], etc.
+Populate the 'citations' array with corresponding entries: {id, url, snippet}.
+The snippet should be the exact text from the source that supports the claim.
+Each citation id must be unique across the entire report."""
 
 
 def synthesize(state: dict) -> dict:

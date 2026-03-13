@@ -6,7 +6,7 @@ from backend.models import (
     ExploreReport, DeepDiveReport, CriticVerification,
     CriticReport, StatusEvent, ExploreCompany,
     DeepDiveSection, FundingRound, NewsItem, CompetitorEntry,
-    PersonEntry, RedFlag
+    PersonEntry, RedFlag, Citation
 )
 
 def test_company_profile_requires_source_for_funding():
@@ -144,3 +144,28 @@ def test_deep_dive_report_with_metadata():
     assert r.headquarters == "NYC"
     assert len(r.people_entries) == 1
     assert len(r.red_flag_entries) == 1
+
+
+class TestCitationModel:
+    def test_citation_valid(self):
+        from backend.models import Citation
+        c = Citation(id=1, url="https://example.com", snippet="test snippet")
+        assert c.id == 1
+        assert c.url == "https://example.com"
+
+    def test_deep_dive_report_accepts_citations(self):
+        from backend.models import Citation, DeepDiveReport, DeepDiveSection
+        section = DeepDiveSection(title="Overview", content="Test [1]", confidence=0.8)
+        report = DeepDiveReport(
+            query="Test",
+            company_name="Test Co",
+            overview=section,
+            funding=section,
+            key_people=section,
+            product_technology=section,
+            recent_news=section,
+            competitors=section,
+            red_flags=section,
+            citations=[Citation(id=1, url="https://example.com", snippet="test")],
+        )
+        assert len(report.citations) == 1

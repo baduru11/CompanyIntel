@@ -18,7 +18,10 @@ Your job:
 5. List specific data gaps
 6. If more than 3 major sections have confidence < 0.4, recommend a retry with specific search queries
 
-Be strict. An unverified claim is worse than 'Data not available'."""
+Be strict. An unverified claim is worse than 'Data not available'.
+
+7. Verify that each citation [N] in the report maps to a valid source URL in the raw data.
+   Flag citations that reference URLs not present in the source pool as 'unverified'."""
 
 
 def critique(state: dict) -> dict:
