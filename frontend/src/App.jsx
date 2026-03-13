@@ -138,16 +138,6 @@ function App() {
     [submit]
   );
 
-  /**
-   * Handle PDF export for deep dive reports.
-   */
-  const handleDownloadPdf = useCallback(() => {
-    // The PDFExport component handles the actual export
-    // This callback is used by DeepDiveView's built-in button
-    if (!reportRef.current) return;
-    // We trigger PDF export programmatically via the PDFExport component
-  }, []);
-
   // Extract company name and date for PDF
   const companyName =
     queryResult?.report?.company?.name ||
@@ -157,6 +147,24 @@ function App() {
   const reportDate = queryResult?.cached_at
     ? new Date(queryResult.cached_at).toLocaleDateString()
     : new Date().toLocaleDateString();
+
+  /**
+   * Handle PDF export for deep dive reports.
+   */
+  const handleDownloadPdf = useCallback(() => {
+    const element = reportRef.current;
+    if (!element) return;
+    import('html2pdf.js').then(({ default: html2pdf }) => {
+      const opt = {
+        margin: [10, 10, 15, 10],
+        filename: `${companyName || 'report'}-intel-report.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      };
+      html2pdf().set(opt).from(element).save();
+    });
+  }, [companyName]);
 
   return (
     <div className="h-screen bg-[hsl(var(--background))] flex flex-col overflow-hidden">
