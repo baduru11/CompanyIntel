@@ -27,6 +27,8 @@ from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 from backend.cache import CacheManager
 from backend.config import get_settings
 from backend.graph import build_deep_dive_graph, build_explore_graph
+from backend.nodes.chat import ChatRequest, generate_chat_response
+from backend.rag import get_indexed_report_count
 from backend.validation import QueryValidation, QuerySuggestion, validate_query_rules, validate_query_semantic, suggest_query
 
 logger = logging.getLogger(__name__)
@@ -346,7 +348,7 @@ async def query(req: QueryRequest):
                         if hasattr(report_obj, "model_dump"):
                             report_dict = report_obj.model_dump()
                             # Stream each top-level section as it "appears"
-                            for key in ["overview", "funding", "key_people", "product_technology", "recent_news", "competitors", "red_flags", "market_opportunity", "business_model", "competitive_advantages", "traction", "risks"]:
+                            for key in ["overview", "funding", "key_people", "product_technology", "recent_news", "competitors", "red_flags", "market_opportunity", "business_model", "competitive_advantages", "traction", "risks", "governance"]:
                                 if key in report_dict and report_dict[key]:
                                     yield ServerSentEvent(
                                         data=json.dumps({"section": key, "content": report_dict[key]}),
@@ -380,6 +382,7 @@ async def query(req: QueryRequest):
                 "critic": critic_data,
                 "query": req.query,
                 "mode": req.mode,
+                "report_id": final_state.get("report_id", ""),
                 "estimated_cost_usd": _estimate_cost(req.mode, settings.llm_model),
             }
 
@@ -408,3 +411,21 @@ async def query(req: QueryRequest):
                 )
 
     return EventSourceResponse(event_generator())
+
+
+@app.post("/api/chat")
+async def chat(req: ChatRequest):
+    """Chat with research data via RAG + LLM streaming."""
+    async def event_generator():
+        async for event in generate_chat_response(req):
+            yield ServerSentEvent(
+                event=event["type"],
+                data=json.dumps(event),
+            )
+    return EventSourceResponse(event_generator())
+
+
+@app.get("/api/chat/status")
+async def chat_status():
+    """Return count of indexed reports for the scope toggle UI."""
+    return {"indexed_reports": get_indexed_report_count()}

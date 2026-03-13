@@ -38,6 +38,7 @@ class AgentState(TypedDict, total=False):
     raw_signals: list[RawCompanySignal]
     company_profiles: list[CompanyProfile]
     report: Union[ExploreReport, DeepDiveReport]
+    report_id: str
     critic_report: CriticReport
     status_events: Annotated[list[StatusEvent], operator.add]
 
