@@ -83,6 +83,9 @@ export default function FundingChart({ fundingRounds = [] }) {
         amount: amt,
         cumulative,
         investors,
+        lead_investor: round.lead_investor || "",
+        pre_money_valuation: round.pre_money_valuation || "",
+        post_money_valuation: round.post_money_valuation || "",
       };
     });
   }, [fundingRounds]);
@@ -154,7 +157,16 @@ export default function FundingChart({ fundingRounds = [] }) {
                 Amount
               </th>
               <th className="py-2.5 px-4 text-left text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                Lead Investor
+              </th>
+              <th className="py-2.5 px-4 text-left text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
                 Investors
+              </th>
+              <th className="py-2.5 px-4 text-right text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                Pre-Money
+              </th>
+              <th className="py-2.5 px-4 text-right text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                Post-Money
               </th>
             </tr>
           </thead>
@@ -176,8 +188,17 @@ export default function FundingChart({ fundingRounds = [] }) {
                 <td className="py-2.5 px-4 text-right text-emerald-400 font-medium tabular-nums">
                   {formatAmount(round.amount)}
                 </td>
+                <td className="py-2.5 px-4 text-[hsl(var(--foreground))]">
+                  {round.lead_investor || "\u2014"}
+                </td>
                 <td className="py-2.5 px-4 text-[hsl(var(--muted-foreground))]">
                   {round.investors || "\u2014"}
+                </td>
+                <td className="py-2.5 px-4 text-right text-[hsl(var(--muted-foreground))] tabular-nums">
+                  {round.pre_money_valuation || "\u2014"}
+                </td>
+                <td className="py-2.5 px-4 text-right text-[hsl(var(--muted-foreground))] tabular-nums">
+                  {round.post_money_valuation || "\u2014"}
                 </td>
               </tr>
             ))}
