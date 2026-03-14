@@ -39,27 +39,43 @@ logging.basicConfig(level=logging.INFO)
 # ---------------------------------------------------------------------------
 # Approximate token costs (USD per 1M tokens) — update when switching models
 _MODEL_COSTS = {
-    "deepseek/deepseek-v3.2": {"input": 0.14, "output": 0.28},
+    "deepseek/deepseek-v3.2": {"input": 0.26, "output": 0.38},
+    "deepseek/deepseek-chat": {"input": 0.32, "output": 0.89},
+    "google/gemini-2.5-flash-lite": {"input": 0.10, "output": 0.40},
+    "google/gemini-2.5-flash": {"input": 0.30, "output": 2.50},
     "openai/gpt-4o": {"input": 2.50, "output": 10.00},
     "anthropic/claude-sonnet-4": {"input": 3.00, "output": 15.00},
 }
 
 
-def _estimate_cost(mode: str, model: str) -> float | None:
-    """Rough cost estimate based on mode and model. Returns USD."""
-    costs = _MODEL_COSTS.get(model)
-    if not costs:
+def _estimate_cost(mode: str, prose_model: str, extraction_model: str) -> float | None:
+    """Rough cost estimate based on mode and models. Returns USD."""
+    prose = _MODEL_COSTS.get(prose_model)
+    extract = _MODEL_COSTS.get(extraction_model)
+    if not prose:
         return None
-    # Approximate token usage by mode (measured from real runs)
+    # Use extraction model costs if available, else fall back to prose model
+    ext = extract or prose
     if mode == "explore":
-        input_tokens, output_tokens = 8_000, 4_000
+        # Planner + profiler + explore synthesis: extraction model (~10K in, 5K out)
+        # Critic: prose model (~15K in, 3K out)
+        return round(
+            (10_000 / 1_000_000) * ext["input"]
+            + (5_000 / 1_000_000) * ext["output"]
+            + (15_000 / 1_000_000) * prose["input"]
+            + (3_000 / 1_000_000) * prose["output"],
+            4,
+        )
     else:
-        input_tokens, output_tokens = 25_000, 8_000
-    return round(
-        (input_tokens / 1_000_000) * costs["input"]
-        + (output_tokens / 1_000_000) * costs["output"],
-        4,
-    )
+        # Extraction stages (planner + profiler + metadata): ~17K in, 9K out
+        # Prose stages (13 sections + score + critic): ~125K in, 42K out
+        return round(
+            (17_000 / 1_000_000) * ext["input"]
+            + (9_000 / 1_000_000) * ext["output"]
+            + (125_000 / 1_000_000) * prose["input"]
+            + (42_000 / 1_000_000) * prose["output"],
+            4,
+        )
 
 
 # Startup check — log whether API keys are loaded
@@ -68,6 +84,7 @@ logger.info("OPENROUTER_API_KEY loaded: %s", bool(_s.openrouter_api_key))
 logger.info("TAVILY_API_KEY loaded: %s", bool(_s.tavily_api_key))
 logger.info("EXA_API_KEY loaded: %s", bool(_s.exa_api_key))
 logger.info("SERPER_API_KEY loaded: %s", bool(_s.serper_api_key))
+logger.info("Models — prose: %s, extraction: %s, chat: %s", _s.llm_model, _s.extraction_model, _s.chat_model)
 
 # ---------------------------------------------------------------------------
 # Fixture loading for offline / demo mode
@@ -336,24 +353,24 @@ async def query(req: QueryRequest):
                     if node_name == "__start__":
                         continue
 
-                    # Emit "complete" for the node that just finished
-                    yield ServerSentEvent(
-                        data=json.dumps({"node": node_name, "status": "complete", "detail": f"{node_name.title()} complete"}),
-                        event="status",
-                    )
-
-                    # After synthesis completes, stream report sections
+                    # Stream report sections BEFORE emitting "complete" for synthesis,
+                    # so the frontend receives section data before it thinks synthesis is done.
                     if node_name == "synthesis" and isinstance(output, dict) and "report" in output:
                         report_obj = output["report"]
                         if hasattr(report_obj, "model_dump"):
                             report_dict = report_obj.model_dump()
-                            # Stream each top-level section as it "appears"
                             for key in ["overview", "funding", "key_people", "product_technology", "recent_news", "competitors", "red_flags", "market_opportunity", "business_model", "competitive_advantages", "traction", "risks", "governance"]:
                                 if key in report_dict and report_dict[key]:
                                     yield ServerSentEvent(
                                         data=json.dumps({"section": key, "content": report_dict[key]}),
                                         event="section",
                                     )
+
+                    # Emit "complete" for the node that just finished
+                    yield ServerSentEvent(
+                        data=json.dumps({"node": node_name, "status": "complete", "detail": f"{node_name.title()} complete"}),
+                        event="status",
+                    )
 
                     # Emit "running" for the next node in the pipeline
                     try:
@@ -383,7 +400,7 @@ async def query(req: QueryRequest):
                 "query": req.query,
                 "mode": req.mode,
                 "report_id": final_state.get("report_id", ""),
-                "estimated_cost_usd": _estimate_cost(req.mode, settings.llm_model),
+                "estimated_cost_usd": _estimate_cost(req.mode, settings.llm_model, settings.extraction_model),
             }
 
             # Cache the result

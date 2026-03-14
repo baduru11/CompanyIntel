@@ -126,9 +126,11 @@ User query: {query}"""
 async def validate_query_semantic(query: str) -> QueryValidation:
     """Use a single LLM call to check business relevance. Fail-closed on errors."""
     try:
-        from backend.config import get_llm
+        from backend.config import get_settings, get_llm
 
-        llm = get_llm()
+        settings = get_settings()
+        # Use the cheap extraction model for fast classification
+        llm = get_llm(settings.extraction_model, timeout=15)
         response = await llm.ainvoke(_SEMANTIC_PROMPT.format(query=query))
         text = response.content.strip()
 
@@ -241,13 +243,16 @@ async def suggest_query(query: str, mode: str) -> QuerySuggestion:
     """Combine validation + suggestion generation in a single LLM call.
 
     Grounded by a quick web search so suggestions reflect real-time data,
-    not just the LLM's training cutoff.
+    not just the LLM's training cutoff.  Uses the chat model (lighter/faster)
+    instead of the research model since this is a simple classification task.
 
     Fail-open: on any error, returns confidence=1.0 so the user proceeds
     with their original query unblocked.
     """
     try:
-        from backend.config import get_llm
+        from backend.config import get_settings, get_llm
+
+        settings = get_settings()
 
         # Quick web search for real-time grounding (runs synchronously, ~200ms)
         web_results = _quick_web_search(query)
@@ -255,7 +260,8 @@ async def suggest_query(query: str, mode: str) -> QuerySuggestion:
         if web_results:
             web_context = f"\nWeb search results for \"{query}\":\n{web_results}\n"
 
-        llm = get_llm()
+        # Use the cheap extraction model for fast classification
+        llm = get_llm(settings.extraction_model, timeout=15)
         response = await llm.ainvoke(
             _SUGGEST_PROMPT.format(query=query, mode=mode, web_context=web_context)
         )
