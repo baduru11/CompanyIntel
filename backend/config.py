@@ -31,6 +31,7 @@ class Settings:
         self.llm_provider: str = "openrouter"
         self.llm_model: str = os.getenv("LLM_MODEL", "deepseek/deepseek-v3.2")
         self.chat_model: str = os.getenv("CHAT_MODEL", "deepseek/deepseek-chat")
+        self.extraction_model: str = os.getenv("EXTRACTION_MODEL", "google/gemini-2.5-flash-lite")
         self.diffbot_api_key: str = os.getenv("DIFFBOT_API_KEY", "")
         self.cache_dir: str = os.getenv("CACHE_DIR", "cache")
         self.langsmith_tracing: bool = os.getenv("LANGCHAIN_TRACING_V2", "").lower() == "true"
@@ -41,21 +42,36 @@ def get_settings() -> Settings:
     return Settings()
 
 
-def get_llm():
+from langchain_openai import ChatOpenAI
+
+
+def get_llm(model: str | None = None, timeout: float = 120):
+    """Create a ChatOpenAI instance for OpenRouter.
+
+    Args:
+        model: Override model name. Defaults to settings.llm_model (prose/reasoning).
+               Use settings.extraction_model for structured JSON extraction tasks.
+        timeout: Request timeout in seconds. Default 120s for pipeline,
+                 use 15s for quick validation calls.
+
+    Returns a new instance each call — construction is cheap (~1ms) after
+    the module-level import, and separate instances are thread-safe for
+    parallel pipeline nodes.
+    """
     settings = get_settings()
     if not settings.openrouter_api_key:
         raise ValueError("OPENROUTER_API_KEY not set")
-    from langchain_openai import ChatOpenAI
+    model = model or settings.llm_model
     # NOTE: ChatOpenAI renames max_tokens → max_completion_tokens in the
     # payload, which OpenRouter doesn't recognise.  Passing it via extra_body
     # ensures the raw "max_tokens" key reaches the provider.
     return ChatOpenAI(
-        model=settings.llm_model,
+        model=model,
         api_key=settings.openrouter_api_key,
         base_url="https://openrouter.ai/api/v1",
         temperature=0,
         extra_body={"max_tokens": 16384},
-        request_timeout=300,
+        request_timeout=timeout,
     )
 
 
@@ -139,16 +155,23 @@ def invoke_structured(llm, schema: type[T], messages: list) -> T:
         structured_llm = llm.with_structured_output(schema)
         return structured_llm.invoke(messages)
     except Exception as first_err:
-        # Check if this is a recoverable parsing error
+        # Check if this is a recoverable parsing/format error worth retrying
+        # with manual JSON parsing. Non-recoverable errors (auth, rate limit,
+        # model not found, content blocked) should propagate immediately.
         err_str = str(first_err).lower()
         err_type = type(first_err).__name__.lower()
-        recoverable = (
-            "json" in err_str
-            or "invalid" in err_str
-            or "length" in err_str
-            or "lengthfinishreason" in err_type
+        non_recoverable = (
+            "auth" in err_str
+            or "api key" in err_str
+            or "rate limit" in err_str
+            or "429" in err_str
+            or "not found" in err_str
+            or "content filter" in err_str
+            or "safety" in err_str
+            or "timeout" in err_str
+            or "timed out" in err_str
         )
-        if not recoverable:
+        if non_recoverable:
             raise
 
         logger.warning("Structured output failed, retrying with manual parsing: %s", first_err)
