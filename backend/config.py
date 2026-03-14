@@ -9,6 +9,7 @@ from functools import lru_cache
 from typing import TypeVar
 
 from dotenv import load_dotenv
+from langchain_core.messages import HumanMessage
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -76,11 +77,23 @@ def get_llm(model: str | None = None, timeout: float = 120):
 
 
 def _strip_fences(text: str) -> str:
-    """Remove markdown code fences from LLM output."""
+    """Remove markdown code fences and extract JSON from LLM output."""
     text = text.strip()
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\s*", "", text)
         text = re.sub(r"\s*```$", "", text)
+        return text
+    # If text doesn't start with { or [, try to extract embedded JSON
+    if text and text[0] not in ('{', '['):
+        # Look for a JSON object or array within the text
+        start = text.find('{')
+        if start == -1:
+            start = text.find('[')
+        if start != -1:
+            # Find the matching closing bracket from the end
+            for end in range(len(text) - 1, start, -1):
+                if text[end] in ('}', ']'):
+                    return text[start:end + 1]
     return text
 
 
@@ -158,26 +171,40 @@ def invoke_structured(llm, schema: type[T], messages: list) -> T:
         # Check if this is a recoverable parsing/format error worth retrying
         # with manual JSON parsing. Non-recoverable errors (auth, rate limit,
         # model not found, content blocked) should propagate immediately.
-        err_str = str(first_err).lower()
-        err_type = type(first_err).__name__.lower()
-        non_recoverable = (
-            "auth" in err_str
-            or "api key" in err_str
-            or "rate limit" in err_str
-            or "429" in err_str
-            or "not found" in err_str
-            or "content filter" in err_str
-            or "safety" in err_str
-            or "timeout" in err_str
-            or "timed out" in err_str
-        )
-        if non_recoverable:
+        # Pydantic ValidationErrors are always recoverable (LLM returned wrong format).
+        from pydantic import ValidationError as _PydanticVE
+        if isinstance(first_err, _PydanticVE):
+            is_recoverable = True
+        else:
+            err_str = str(first_err).lower()
+            non_recoverable = (
+                "auth" in err_str
+                or "api key" in err_str
+                or "rate limit" in err_str
+                or "429" in err_str
+                or "model not found" in err_str
+                or "content filter" in err_str
+                or "content_policy" in err_str
+                or "safety" in err_str
+                or "timeout" in err_str
+                or "timed out" in err_str
+            )
+            is_recoverable = not non_recoverable
+        if not is_recoverable:
             raise
 
         logger.warning("Structured output failed, retrying with manual parsing: %s", first_err)
 
-        # Fallback: raw invoke + strip fences + parse manually
-        response = llm.invoke(messages)
+        # Fallback: raw invoke with explicit JSON instruction + strip fences + parse
+        json_schema = schema.model_json_schema()
+        fallback_messages = list(messages) + [
+            HumanMessage(content=(
+                "IMPORTANT: Respond ONLY with valid JSON matching this schema, "
+                "no markdown, no explanations:\n"
+                + json.dumps(json_schema, indent=2)
+            ))
+        ]
+        response = llm.invoke(fallback_messages)
         text = _strip_fences(response.content)
         try:
             return schema.model_validate_json(text)
