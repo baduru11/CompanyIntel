@@ -103,6 +103,9 @@ export default function ForceGraph({
 
   const nodeCanvasObject = useCallback(
     (node, ctx) => {
+      // Skip rendering before force simulation positions the node
+      if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) return;
+
       const r = node.radius || 8;
       const isSelected = selectedNode && (selectedNode === node.id || selectedNode === node.name);
       const isHovered = hoveredNode && (hoveredNode.id === node.id);
@@ -151,6 +154,7 @@ export default function ForceGraph({
   );
 
   const nodePointerAreaPaint = useCallback((node, color, ctx) => {
+    if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) return;
     const r = node.radius || 8;
     ctx.beginPath();
     ctx.arc(node.x, node.y, r + 4, 0, 2 * Math.PI);
