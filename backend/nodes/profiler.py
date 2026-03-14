@@ -40,6 +40,10 @@ PEOPLE (key_people): List of dicts with:
   - "name", "title", "background" (career history, prior roles)
   - "linkedin_url": CRITICAL — always include if found. Look for "linkedin.com/in/" patterns.
   - Prior exits/acquisitions, domain expertise years, and notable affiliations.
+  CRITICAL: ONLY include people who are confirmed employees/founders/executives of the TARGET
+  company being researched. Do NOT include people from competitor companies, investors, partners,
+  or other organizations that appear in the search results. Every person MUST have a title at the
+  target company. If you cannot confirm someone works at the target company, omit them.
   Example: [{"name": "Jane Doe", "title": "CEO", "background": "Previously VP at Google",
              "linkedin_url": "https://linkedin.com/in/janedoe"}]
 

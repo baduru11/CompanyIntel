@@ -288,13 +288,16 @@ def _merge_profiles_into_meta(meta: MetadataAndArrays, profiles: list[CompanyPro
                 meta.company_name = p.name
 
         # People — merge any profiler-extracted people the LLM missed
+        # Only merge people who have a title (people without titles are likely
+        # from other companies that appeared in search results)
         existing_people = {pe.name.lower().strip() for pe in meta.people_entries}
         for person in p.key_people:
             name = person.get("name", "")
-            if name and name.lower().strip() not in existing_people:
+            title = person.get("title")
+            if name and name.lower().strip() not in existing_people and title:
                 meta.people_entries.append(PersonEntry(
                     name=name,
-                    title=person.get("title"),
+                    title=title,
                     background=person.get("background"),
                     linkedin_url=person.get("linkedin_url"),
                     source_url=person.get("source_url"),
@@ -485,6 +488,22 @@ def synthesize(state: dict) -> dict:
 
     meta.funding_rounds = deduplicate_funding_rounds(meta.funding_rounds)
 
+    # Recompute total_funding from actual deduplicated rounds so it matches
+    # the funding history table. The LLM's total_funding is often inconsistent
+    # with the individual rounds it extracted.
+    if meta.funding_rounds:
+        from backend.utils import _parse_amount
+        computed_total = sum(_parse_amount(r.amount) for r in meta.funding_rounds)
+        if computed_total > 0:
+            if computed_total >= 1_000_000_000:
+                meta.total_funding = f"${computed_total / 1_000_000_000:.1f}B"
+            elif computed_total >= 1_000_000:
+                meta.total_funding = f"${computed_total / 1_000_000:.1f}M"
+            elif computed_total >= 1_000:
+                meta.total_funding = f"${computed_total / 1_000:.0f}K"
+            else:
+                meta.total_funding = f"${computed_total:,.0f}"
+
     # Assign sequential citation IDs (LLM may return inconsistent IDs)
     for i, cit in enumerate(meta.citations, 1):
         cit.id = i
@@ -496,6 +515,18 @@ def synthesize(state: dict) -> dict:
     # 1b. Fill metadata gaps from already-structured profile fields.
     # The LLM re-extraction sometimes misses basic info that the profiler already captured.
     _merge_profiles_into_meta(meta, profiles, company_name)
+
+    # 1c. Filter out people without titles — these are almost always from other
+    # companies that appeared in search results (hallucinated affiliations).
+    if meta.people_entries:
+        before = len(meta.people_entries)
+        meta.people_entries = [
+            pe for pe in meta.people_entries
+            if pe.title and pe.title.strip().lower() not in ("", "none", "n/a", "unknown")
+        ]
+        removed = before - len(meta.people_entries)
+        if removed:
+            logger.info("Filtered %d people without valid titles", removed)
 
     # 2. Generate logo URL from company website
     logo_url = None
