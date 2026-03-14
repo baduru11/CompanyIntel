@@ -145,8 +145,10 @@ METADATA:
 
 STRUCTURED ARRAYS (extract directly from profile data AND raw source snippets):
 - funding_rounds: [{date, stage, amount, investors: [string], lead_investor: string or null, pre_money_valuation: string or null, post_money_valuation: string or null, source_url}]
-  IMPORTANT: Deduplicate funding rounds. If two rounds have the same amount and overlapping investors,
-  keep only the one with the more specific date. Never list the same round twice.
+  CRITICAL DEDUP: Multiple sources often report the SAME round with slightly different amounts
+  (e.g. $3.4M vs $3.5M vs $3.9M) or with different subsets of investors. These are ONE round.
+  If amounts are within 30% of each other AND the investor lists overlap, it is the SAME round.
+  Output it only ONCE with the most specific date and the most complete investor list.
   Include lead_investor separately from the investors list. Include valuations if mentioned.
 - people_entries: [{name, title, background, source_url, linkedin_url, prior_exits: [string], domain_expertise_years: int, notable_affiliations: [string]}]
   IMPORTANT: Only include people who WORK AT the target company (founders, executives, employees).
