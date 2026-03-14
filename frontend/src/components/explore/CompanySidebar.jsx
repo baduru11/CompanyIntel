@@ -1,4 +1,4 @@
-import { X, ArrowRight, Building2, Calendar, MapPin, DollarSign, Users, ExternalLink } from "lucide-react";
+import { X, ArrowRight, Building2, Calendar, MapPin, DollarSign, Users, ExternalLink, Star, Download, UserCheck } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
@@ -124,6 +124,9 @@ export default function CompanySidebar({
                   ? company.key_investors.join(", ")
                   : company.key_investors
               )}
+              {detail(Star, "Rating", company.app_store_rating != null ? `${company.app_store_rating}★${company.app_store_reviews ? ` (${company.app_store_reviews})` : ""}` : null)}
+              {detail(Download, "Downloads", company.app_downloads)}
+              {detail(UserCheck, "Users", company.user_count)}
             </div>
 
             {/* Deep Dive button */}

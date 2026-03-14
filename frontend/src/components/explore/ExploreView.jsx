@@ -135,7 +135,17 @@ function CompanyRow({ company, index, onSelect, onDeepDive }) {
         {company.founding_year || "\u2014"}
       </td>
       <td className="py-3.5 px-3 text-sm text-[hsl(var(--muted-foreground))]">
-        {company.headquarters || "\u2014"}
+        {company.app_store_rating != null ? (
+          <span className="flex items-center gap-1">
+            <span className="text-amber-400">★</span>
+            <span>{company.app_store_rating}</span>
+            {company.app_store_reviews && <span className="text-xs opacity-60">({company.app_store_reviews})</span>}
+          </span>
+        ) : company.app_downloads ? (
+          <span>{company.app_downloads} downloads</span>
+        ) : company.user_count ? (
+          <span>{company.user_count}</span>
+        ) : "\u2014"}
       </td>
       <td className="py-3.5 px-3">
         <div className={cn("text-xs font-mono tabular-nums", confidenceColor(company.confidence))}>
@@ -188,6 +198,10 @@ export default function ExploreView({ data, onDeepDive }) {
       confidence: c.confidence ?? null,
       headquarters: c.headquarters || c.hq || "",
       key_investors: c.key_investors || [],
+      app_store_rating: c.app_store_rating ?? null,
+      app_store_reviews: c.app_store_reviews || "",
+      app_downloads: c.app_downloads || "",
+      user_count: c.user_count || "",
     }));
   }, [data]);
 
@@ -377,7 +391,7 @@ export default function ExploreView({ data, onDeepDive }) {
                   <SortHeader label="Funding" sortKey="funding_numeric" />
                   <SortHeader label="Stage" sortKey="funding_stage" />
                   <SortHeader label="Founded" sortKey="founding_year" />
-                  <SortHeader label="HQ" sortKey="headquarters" />
+                  <SortHeader label="Traction" sortKey="app_store_rating" />
                   <SortHeader label="Confidence" sortKey="confidence" />
                   <th className="py-3 px-3 w-24"></th>
                 </tr>
