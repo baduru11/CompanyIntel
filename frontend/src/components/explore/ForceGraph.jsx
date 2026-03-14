@@ -74,13 +74,19 @@ export default function ForceGraph({
     fg.d3Force("link")?.distance(60).strength(0.4);
   }, []);
 
-  // Zoom to fit after data loads
+  // Zoom to fit after simulation settles — only once
+  const hasZoomed = useRef(false);
+  useEffect(() => {
+    hasZoomed.current = false;
+  }, [companies]);
+
   useEffect(() => {
     const fg = graphRef.current;
-    if (!fg || companies.length === 0) return;
+    if (!fg || companies.length === 0 || hasZoomed.current) return;
     const timer = setTimeout(() => {
-      fg.zoomToFit(400, 40);
-    }, 600);
+      fg.zoomToFit(400, 80);
+      hasZoomed.current = true;
+    }, 800);
     return () => clearTimeout(timer);
   }, [companies]);
 
@@ -311,9 +317,9 @@ export default function ForceGraph({
         cooldownTicks={200}
         enableZoomInteraction={true}
         enablePanInteraction={true}
-        // Force configuration
         dagMode={null}
-        onEngineStop={() => graphRef.current?.zoomToFit(300, 50)}
+        minZoom={0.5}
+        maxZoom={8}
       />
 
       {/* Sector legend */}

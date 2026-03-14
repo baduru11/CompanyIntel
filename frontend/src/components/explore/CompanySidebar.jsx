@@ -47,15 +47,24 @@ export default function CompanySidebar({
   };
 
   return (
-    <div
-      className={cn(
-        "fixed top-0 right-0 h-full w-80 z-30",
-        "glass-strong border-l border-[hsl(var(--border))]",
-        "shadow-2xl shadow-black/30",
-        "transition-transform duration-300 ease-in-out",
-        isOpen ? "translate-x-0" : "translate-x-full"
+    <>
+      {/* Backdrop — click to close */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-20 bg-black/20"
+          onClick={onClose}
+        />
       )}
-    >
+
+      <div
+        className={cn(
+          "absolute top-0 right-0 h-full w-80 z-30",
+          "glass-strong border-l border-[hsl(var(--border))]",
+          "shadow-2xl shadow-black/30",
+          "transition-transform duration-300 ease-in-out",
+          isOpen ? "translate-x-0" : "translate-x-full"
+        )}
+      >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3.5 border-b border-[hsl(var(--border))]">
         <h2 className="text-sm font-semibold text-[hsl(var(--foreground))] truncate">
@@ -146,5 +155,6 @@ export default function CompanySidebar({
         </ScrollArea>
       )}
     </div>
+    </>
   );
 }
