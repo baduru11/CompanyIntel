@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from langchain_core.messages import SystemMessage, HumanMessage
 from backend.config import get_llm, get_settings, invoke_structured
 from backend.models import (
-    CompanyProfile, ExploreReport, DeepDiveReport, DeepDiveSection,
+    CompanyProfile, ExploreCompany, ExploreReport, DeepDiveReport, DeepDiveSection,
     SectionProse, FundingRound, PersonEntry, NewsItem, CompetitorEntry,
     RedFlag, RiskEntry, Citation, InvestmentScore,
     BoardMember, Advisor, Partnership, KeyCustomer, Acquisition,
@@ -40,6 +40,23 @@ CRITICAL: Only include information from the provided data. Write 'Data not avail
 CITATIONS: For every factual claim, include an inline citation marker like [1], [2], etc.
 Populate the 'citations' array with corresponding entries: {id, url, snippet}.
 The snippet should be the exact text from the source that supports the claim."""
+
+
+def _parse_funding_numeric(funding_str: str | None) -> float:
+    """Extract a numeric funding value (in millions) from a string like '$720M'."""
+    if not funding_str:
+        return 0.0
+    m = re.search(r'\$\s*([\d.]+)\s*([BMK])?', funding_str, re.IGNORECASE)
+    if not m:
+        return 0.0
+    val = float(m.group(1))
+    unit = (m.group(2) or '').upper()
+    if unit == 'B':
+        val *= 1000
+    elif unit == 'K':
+        val /= 1000
+    return val
+
 
 _SECTION_FORMAT_RULES = """
 FORMAT RULES (apply to every section):
@@ -451,8 +468,32 @@ def synthesize(state: dict) -> dict:
                 HumanMessage(content=f"Query: {state['query']}\n\nCompany profiles:\n{profiles_text}")
             ])
         except Exception as exc:
-            logger.error("Synthesis LLM call failed for query=%s mode=%s: %s", state['query'], mode, exc)
-            raise RuntimeError(f"Synthesis failed: {exc}") from exc
+            logger.error("Synthesis LLM call failed for query=%s mode=%s: %s — building fallback report from profiles", state['query'], mode, exc)
+            # Graceful degradation: build a minimal ExploreReport from raw profiles
+            fallback_companies = []
+            for p in profiles:
+                fallback_companies.append(ExploreCompany(
+                    name=p.name or "Unknown",
+                    sub_sector=p.sub_sector or "Unknown",
+                    funding_total=p.funding_total,
+                    funding_numeric=_parse_funding_numeric(p.funding_total),
+                    funding_stage=p.funding_stage,
+                    founding_year=p.founding_year,
+                    headquarters=p.headquarters,
+                    key_investors=p.key_investors or [],
+                    description=p.description or p.core_product,
+                    confidence=p.funding_confidence if p.funding_confidence else 0.2,
+                    source_count=len(p.raw_sources) if p.raw_sources else 0,
+                ))
+            sub_sectors = list({c.sub_sector for c in fallback_companies if c.sub_sector and c.sub_sector != "Unknown"})
+            report = ExploreReport(
+                query=state["query"],
+                sector=state["query"],
+                companies=fallback_companies,
+                sub_sectors=sub_sectors,
+                summary="Report generated from raw profile data (LLM synthesis unavailable).",
+                citations=[],
+            )
         return {"report": report}
 
     # --- Deep-dive: parallel synthesis ---
