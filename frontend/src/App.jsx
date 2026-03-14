@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, Component } from "react";
 
 // Layout
 import TopBar from "./components/layout/TopBar";
@@ -37,6 +37,81 @@ function deriveCurrentStep(events) {
     }
   }
   return maxStep;
+}
+
+// ---------------------------------------------------------------------------
+// URL helpers — sync view state to search params
+// ---------------------------------------------------------------------------
+function readViewFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  const view = params.get("view"); // "explore" | "deep_dive" | null
+  const q = params.get("q") || "";
+  const mode = params.get("mode") || view || "";
+  if (view === "explore" || view === "deep_dive") {
+    return { view, query: q, mode };
+  }
+  return { view: "history", query: "", mode: "" };
+}
+
+function pushViewToURL(view, query, mode) {
+  const params = new URLSearchParams();
+  if (view && view !== "history") {
+    params.set("view", view);
+    if (query) params.set("q", query);
+    if (mode) params.set("mode", mode);
+    const url = `${window.location.pathname}?${params.toString()}`;
+    window.history.pushState({}, "", url);
+  } else {
+    window.history.pushState({}, "", window.location.pathname);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Error Boundary — catches rendering crashes in views
+// ---------------------------------------------------------------------------
+class ViewErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, info) {
+    console.error("[ViewErrorBoundary] Caught rendering error:", error, info.componentStack);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full animate-fade-in">
+          <div className="flex flex-col items-center gap-4 max-w-md text-center px-6">
+            <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
+              <span className="text-red-400 text-xl">!</span>
+            </div>
+            <p className="text-sm font-medium text-[hsl(var(--foreground))]">
+              Something went wrong rendering this view
+            </p>
+            <p className="text-xs text-[hsl(var(--muted-foreground))] max-h-24 overflow-auto font-mono">
+              {this.state.error?.message || "Unknown error"}
+            </p>
+            <button
+              onClick={() => {
+                this.setState({ hasError: false, error: null });
+                this.props.onReset?.();
+              }}
+              className="mt-2 px-4 py-2 text-sm rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity cursor-pointer"
+            >
+              Go Home
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 /**
@@ -85,7 +160,9 @@ function QueryLoading({ mode, currentStep }) {
 }
 
 function App() {
-  const [currentView, setCurrentView] = useState("history");
+  // Read initial view from URL so refresh/bookmarks restore state
+  const initialURL = useMemo(() => readViewFromURL(), []);
+  const [currentView, setCurrentView] = useState(initialURL.view);
   const [queryResult, setQueryResult] = useState(null);
   const [agentLogOpen, setAgentLogOpen] = useState(false);
 
@@ -105,17 +182,48 @@ function App() {
   const [selectedQuery, setSelectedQuery] = useState(null);
   const currentStep = useMemo(() => deriveCurrentStep(events), [events]);
 
+  // Sync result from hook → local queryResult
   useEffect(() => {
     if (result) {
       setQueryResult(result);
     }
   }, [result]);
 
+  // On mount: if URL says explore/deep_dive, restore last result from localStorage
+  // and re-trigger the query if no cached result exists
+  useEffect(() => {
+    if (initialURL.view !== "history" && initialURL.query) {
+      // Try to load from localStorage (the hook already does this)
+      if (result) {
+        setQueryResult(result);
+      } else {
+        // No cached result — trigger the pipeline
+        submit(initialURL.query, initialURL.mode || initialURL.view);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Listen for browser back/forward
+  useEffect(() => {
+    const handlePopState = () => {
+      const { view, query, mode } = readViewFromURL();
+      setCurrentView(view);
+      if (view === "history") {
+        setQueryResult(null);
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   const handleSubmit = useCallback(
     (query, mode) => {
-      setCurrentView(mode === "deep_dive" ? "deep_dive" : "explore");
+      const view = mode === "deep_dive" ? "deep_dive" : "explore";
+      setCurrentView(view);
       setQueryResult(null);
       setAgentLogOpen(false);
+      pushViewToURL(view, query, mode);
       submit(query, mode);
     },
     [submit]
@@ -124,10 +232,10 @@ function App() {
   const handleSelectSuggestion = useCallback(
     (selected) => {
       setSelectedQuery(selected);
-      setCurrentView(
-        suggestions?.mode === "deep_dive" ? "deep_dive" : "explore"
-      );
+      const view = suggestions?.mode === "deep_dive" ? "deep_dive" : "explore";
+      setCurrentView(view);
       setQueryResult(null);
+      pushViewToURL(view, selected, suggestions?.mode || "explore");
       confirmQuery(selected);
     },
     [confirmQuery, suggestions]
@@ -142,23 +250,28 @@ function App() {
     setCurrentView("history");
     setQueryResult(null);
     setSelectedQuery(null);
+    pushViewToURL("history", "", "");
   }, [cancel]);
 
   const handleLogoClick = useCallback(() => {
     setCurrentView("history");
     setQueryResult(null);
     setSelectedQuery(null);
+    pushViewToURL("history", "", "");
   }, []);
 
   const handleSelectReport = useCallback(async (report) => {
     const mode = report.mode || "explore";
+    const view = mode === "deep_dive" ? "deep_dive" : "explore";
     try {
       const fullReport = await fetchReport(report.filename);
       setQueryResult(fullReport);
-      setCurrentView(mode === "deep_dive" ? "deep_dive" : "explore");
+      setCurrentView(view);
+      pushViewToURL(view, report.query, mode);
     } catch {
-      setCurrentView(mode === "deep_dive" ? "deep_dive" : "explore");
+      setCurrentView(view);
       setQueryResult(null);
+      pushViewToURL(view, report.query, mode);
       submit(report.query, mode);
     }
   }, [submit]);
@@ -169,6 +282,7 @@ function App() {
       if (!companyName) return;
       setCurrentView("deep_dive");
       setQueryResult(null);
+      pushViewToURL("deep_dive", companyName, "deep_dive");
       submit(companyName, "deep_dive");
     },
     [submit]
@@ -178,6 +292,12 @@ function App() {
     if (!queryResult) return;
     exportReportPdf(queryResult);
   }, [queryResult]);
+
+  const handleErrorReset = useCallback(() => {
+    setCurrentView("history");
+    setQueryResult(null);
+    pushViewToURL("history", "", "");
+  }, []);
 
   return (
     <div className="h-screen bg-[hsl(var(--background))] flex flex-col overflow-hidden">
@@ -229,9 +349,11 @@ function App() {
             {isLoading && !queryResult ? (
               <QueryLoading mode="explore" currentStep={currentStep} />
             ) : queryResult ? (
-              <div className="h-full animate-fade-in">
-                <ExploreView data={queryResult} onDeepDive={handleDeepDive} />
-              </div>
+              <ViewErrorBoundary key="explore" onReset={handleErrorReset}>
+                <div className="h-full animate-fade-in">
+                  <ExploreView data={queryResult} onDeepDive={handleDeepDive} />
+                </div>
+              </ViewErrorBoundary>
             ) : error ? (
               <div className="flex flex-col items-center justify-center h-full animate-fade-in">
                 <div className="flex flex-col items-center gap-4 max-w-md text-center px-6">
@@ -257,12 +379,14 @@ function App() {
             {isLoading && !queryResult ? (
               <QueryLoading mode="deep_dive" currentStep={currentStep} />
             ) : queryResult ? (
-              <div className="h-full animate-fade-in">
-                <DeepDiveView
-                  data={queryResult}
-                  onDownloadPdf={handleDownloadPdf}
-                />
-              </div>
+              <ViewErrorBoundary key="deep_dive" onReset={handleErrorReset}>
+                <div className="h-full animate-fade-in">
+                  <DeepDiveView
+                    data={queryResult}
+                    onDownloadPdf={handleDownloadPdf}
+                  />
+                </div>
+              </ViewErrorBoundary>
             ) : error ? (
               <div className="flex flex-col items-center justify-center h-full animate-fade-in">
                 <div className="flex flex-col items-center gap-4 max-w-md text-center px-6">
