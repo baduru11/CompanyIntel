@@ -12,11 +12,12 @@ Given a sector query, generate a search plan to discover 10-20 companies in this
 Output search terms that will find companies, their funding, and key details.
 Include sub-sector categories to organize the landscape.
 
-Include search terms that find TRACTION DATA:
-- App store ratings, downloads, and reviews (e.g. "{sector} best apps 2024 2025 ratings downloads")
-- User counts, MAU, DAU, active users (e.g. "{sector} most popular platforms user base")
-- Product Hunt, G2, Trustpilot, Capterra reviews
-- Revenue, ARR, or growth metrics if available
+Include search terms that find TRACTION & ADOPTION DATA — adapt to the sector:
+- For consumer/apps: app store ratings, downloads, user counts, MAU
+- For SaaS/B2B: G2/Capterra reviews, customer logos, ARR, enterprise deployments
+- For hardware/deep tech: production volume, design wins, partnerships, patents filed
+- For marketplaces/platforms: GMV, transaction volume, seller/buyer count
+- General: Product Hunt upvotes, press coverage, awards, growth metrics
 
 These traction signals help distinguish real products from side projects."""
 

@@ -142,7 +142,7 @@ function CompanyRow({ company, index, onSelect, onDeepDive }) {
             {company.app_store_reviews && <span className="text-xs opacity-60">({company.app_store_reviews})</span>}
           </span>
         ) : company.app_downloads ? (
-          <span>{company.app_downloads} downloads</span>
+          <span>{company.app_downloads}</span>
         ) : company.user_count ? (
           <span>{company.user_count}</span>
         ) : "\u2014"}

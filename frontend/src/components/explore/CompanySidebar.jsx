@@ -125,8 +125,8 @@ export default function CompanySidebar({
                   : company.key_investors
               )}
               {detail(Star, "Rating", company.app_store_rating != null ? `${company.app_store_rating}★${company.app_store_reviews ? ` (${company.app_store_reviews})` : ""}` : null)}
-              {detail(Download, "Downloads", company.app_downloads)}
-              {detail(UserCheck, "Users", company.user_count)}
+              {detail(Download, "Adoption", company.app_downloads)}
+              {detail(UserCheck, "Users / Customers", company.user_count)}
             </div>
 
             {/* Deep Dive button */}

@@ -56,10 +56,10 @@ INPUT FIELD MAPPING — populate each company with:
 - description: 2-3 sentence company description focused on what makes them relevant to the query
 - confidence: 0.0-1.0 based on the rules above
 - source_count: number of distinct sources used for this company
-- app_store_rating: float rating (e.g. 4.5) from App Store or Google Play. Use null if not found.
-- app_store_reviews: review count as string (e.g. "12K reviews"). Use null if not found.
-- app_downloads: download count as string (e.g. "1M+"). Use null if not found.
-- user_count: user/MAU count as string (e.g. "500K users"). Use null if not found.
+- app_store_rating: float rating from any review platform (App Store, G2, Capterra, etc.). null if not found.
+- app_store_reviews: review count string (e.g. "12K reviews", "2.5K on G2"). null if not found.
+- app_downloads: adoption volume string — adapt to sector (downloads, units shipped, deployments, GMV). null if not found.
+- user_count: user/customer count string (e.g. "500K users", "2K enterprise customers", "50K developers"). null if not found.
 
 CRITICAL SOURCING RULES:
 - Only include information explicitly found in the provided source data.
