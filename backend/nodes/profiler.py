@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import httpx
 from langchain_core.messages import SystemMessage, HumanMessage
 from backend.models import RawCompanySignal, CompanyProfile
-from backend.config import get_llm, invoke_structured
+from backend.config import get_llm, get_settings, invoke_structured
 
 logger = logging.getLogger(__name__)
 
@@ -118,8 +118,10 @@ def crawl_page(url: str, timeout: float = 30.0) -> str | None:
         result = crawler.run(url=url)
         if result and result.markdown:
             return result.markdown
-    except Exception:
-        pass
+    except ImportError:
+        logger.debug("Crawl4AI not installed, falling back to Jina Reader")
+    except Exception as exc:
+        logger.debug("Crawl4AI failed for %s: %s, falling back to Jina Reader", url, exc)
 
     # Fallback: Jina Reader
     try:
@@ -142,70 +144,92 @@ def _group_signals_by_company(signals: list[RawCompanySignal]) -> dict[str, list
     return groups
 
 
+def _profile_one_company(
+    company_key: str,
+    company_signals: list[RawCompanySignal],
+    mode: str,
+) -> CompanyProfile:
+    """Profile a single company. Thread-safe — creates its own LLM instance."""
+    if not company_signals:
+        logger.warning("Empty signal list for company_key=%s", company_key)
+        return CompanyProfile(name=company_key)
+
+    llm = get_llm(get_settings().extraction_model)
+
+    snippets = "\n\n".join(
+        f"Source: {s.url}\n{s.snippet}" for s in company_signals
+    )
+
+    extra_content = ""
+    diffbot_data: dict | None = None
+    if mode == "deep_dive":
+        urls = list({s.url for s in company_signals})[:5]
+
+        with ThreadPoolExecutor(max_workers=5) as pool:
+            future_to_url = {pool.submit(crawl_page, url): url for url in urls}
+            for future in as_completed(future_to_url):
+                url = future_to_url[future]
+                try:
+                    page = future.result()
+                    if page:
+                        extra_content += f"\n\n--- Full page: {url} ---\n{page[:3000]}"
+                except Exception as exc:
+                    logger.warning("Crawl failed for %s: %s", url, exc)
+
+        # Diffbot enrichment
+        try:
+            from backend.apis.diffbot import lookup_company_sync
+            diffbot_data = lookup_company_sync(company_signals[0].company_name)
+        except Exception as exc:
+            logger.warning("Diffbot lookup failed for %s: %s", company_key, exc)
+
+    combined = f"{snippets}{extra_content}"
+
+    try:
+        result = invoke_structured(llm, CompanyProfile, [
+            SystemMessage(content=EXTRACTION_PROMPT),
+            HumanMessage(content=f"Extract company profile from:\n\n{combined}")
+        ])
+        if not result.name:
+            result.name = company_signals[0].company_name
+
+        if diffbot_data:
+            _merge_diffbot(result, diffbot_data)
+
+        return result
+    except Exception as exc:
+        logger.warning("LLM extraction failed for company=%s: %s", company_key, exc)
+        return CompanyProfile(
+            name=company_signals[0].company_name,
+            raw_sources=[s.url for s in company_signals],
+        )
+
+
 def profile(state: dict) -> dict:
     """Profile node: extract structured CompanyProfile objects from raw signals.
 
+    Companies are profiled in parallel using a thread pool.
     - Explore mode: Lightweight profiling using Tavily snippets only (no Crawl4AI).
     - Deep Dive mode: Full extraction using Crawl4AI (primary) -> Jina Reader (fallback)
       -> Tavily snippets (last resort).
     """
     mode = state["mode"]
     signals = state["raw_signals"]
-    llm = get_llm()
 
     grouped = _group_signals_by_company(signals)
-    profiles: list[CompanyProfile] = []
 
-    for company_key, company_signals in grouped.items():
-        snippets = "\n\n".join(
-            f"Source: {s.url}\n{s.snippet}" for s in company_signals
-        )
-
-        extra_content = ""
-        diffbot_data: dict | None = None
-        if mode == "deep_dive":
-            urls = list({s.url for s in company_signals})[:3]
-
-            with ThreadPoolExecutor(max_workers=5) as pool:
-                future_to_url = {pool.submit(crawl_page, url): url for url in urls}
-                for future in as_completed(future_to_url):
-                    url = future_to_url[future]
-                    try:
-                        page = future.result()
-                        if page:
-                            extra_content += f"\n\n--- Full page: {url} ---\n{page[:3000]}"
-                    except Exception as exc:
-                        logger.warning("Crawl failed for %s: %s", url, exc)
-
-            # Diffbot enrichment (synchronous to avoid event loop conflicts with FastAPI)
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = {
+            pool.submit(_profile_one_company, key, sigs, mode): key
+            for key, sigs in grouped.items()
+        }
+        profiles: list[CompanyProfile] = []
+        for future in as_completed(futures):
+            company_key = futures[future]
             try:
-                from backend.apis.diffbot import lookup_company_sync
-                diffbot_data = lookup_company_sync(company_signals[0].company_name)
+                profiles.append(future.result())
             except Exception as exc:
-                logger.warning("Diffbot lookup failed for %s: %s", company_key, exc)
-
-        combined = f"{snippets}{extra_content}"
-
-        try:
-            result = invoke_structured(llm, CompanyProfile, [
-                SystemMessage(content=EXTRACTION_PROMPT),
-                HumanMessage(content=f"Extract company profile from:\n\n{combined}")
-            ])
-            # LLM may return empty name — fill from signal data
-            if not result.name:
-                result.name = company_signals[0].company_name
-
-            # Merge Diffbot data (fill gaps only — don't override LLM-extracted data)
-            if diffbot_data:
-                _merge_diffbot(result, diffbot_data)
-
-            profiles.append(result)
-        except Exception as exc:
-            logger.warning("LLM extraction failed for company=%s: %s", company_key, exc)
-            profiles.append(CompanyProfile(
-                name=company_signals[0].company_name,
-                raw_sources=[s.url for s in company_signals],
-            ))
+                logger.error("Profiler thread failed for %s: %s", company_key, exc)
 
     return {"company_profiles": profiles}
 
@@ -226,6 +250,10 @@ def _merge_diffbot(profile: CompanyProfile, diffbot: dict) -> None:
         profile.operating_status = diffbot["operating_status"]
     if not profile.sub_sector and diffbot.get("sub_sector"):
         profile.sub_sector = diffbot["sub_sector"]
+    if not profile.linkedin_url and diffbot.get("linkedin_url"):
+        profile.linkedin_url = diffbot["linkedin_url"]
+    if not profile.crunchbase_url and diffbot.get("crunchbase_url"):
+        profile.crunchbase_url = diffbot["crunchbase_url"]
     # Always merge employee history and revenue (additive data)
     if diffbot.get("employee_count_history"):
         profile.employee_count_history.extend(diffbot["employee_count_history"])

@@ -1,7 +1,6 @@
 # backend/nodes/searcher.py
 from __future__ import annotations
 import logging
-import threading
 from backend.models import RawCompanySignal, SearchPlan
 from backend.rag import store_research, make_report_id
 from backend.config import get_settings
@@ -84,13 +83,13 @@ def _search_exa(client, query: str, num_results: int, cache: CacheManager) -> li
         return []
 
 
-def _search_tavily(client, query: str, cache: CacheManager) -> list[RawCompanySignal]:
+def _search_tavily(client, query: str, num_results: int, cache: CacheManager) -> list[RawCompanySignal]:
     cached = cache.get_api("tavily", query)
     if cached:
         return [RawCompanySignal(**s) for s in cached]
 
     try:
-        response = client.search(query, max_results=10)
+        response = client.search(query, max_results=num_results)
         signals = [
             RawCompanySignal(
                 company_name=r.get("title", "Unknown"),
@@ -108,10 +107,6 @@ def _search_tavily(client, query: str, cache: CacheManager) -> list[RawCompanySi
 
 
 def search(state: dict) -> dict:
-    retry_targets = state.get("retry_targets", [])
-    if retry_targets:
-        logger.info("Targeted retry for sections: %s", retry_targets)
-
     plan: SearchPlan = state["search_plan"]
     mode = state["mode"]
     cache = get_cache()
@@ -147,7 +142,7 @@ def search(state: dict) -> dict:
         results = []
         if tavily is not None:
             for term in plan.search_terms:
-                results.extend(_search_tavily(tavily, term, cache))
+                results.extend(_search_tavily(tavily, term, num_results, cache))
         return results
 
     def _run_serper():
@@ -166,12 +161,26 @@ def search(state: dict) -> dict:
         tavily_results = tavily_future.result()
         serper_results = serper_future.result()
 
-    signals.extend(exa_results)
-    signals.extend(tavily_results)
-    signals.extend(serper_results)
+    # Interleave results from all 3 providers (round-robin) so the signal
+    # list has provider diversity instead of being dominated by whichever
+    # provider's results are concatenated first.
+    all_results = [exa_results, tavily_results, serper_results]
+    max_len = max((len(r) for r in all_results), default=0)
+    for i in range(max_len):
+        for results in all_results:
+            if i < len(results):
+                signals.append(results[i])
 
     if not signals:
         raise RuntimeError("Search failed: no results found from any provider")
+
+    # In deep-dive mode, all signals belong to the target company — normalize
+    # company_name so the profiler groups them into a single profile instead of
+    # fragmenting by page title.
+    if mode == "deep_dive":
+        target_name = state["query"].strip()
+        for s in signals:
+            s.company_name = target_name
 
     # Deduplicate by URL
     seen_urls: set[str] = set()
@@ -181,20 +190,19 @@ def search(state: dict) -> dict:
             seen_urls.add(s.url)
             unique.append(s)
 
-    # Cap results to avoid excessive LLM calls in profiler
-    max_signals = plan.target_company_count * 2 if mode == "explore" else 20
+    # Cap results — deep-dive needs more signals (40) to cover all
+    # sections (governance, patents, partnerships, etc.) since the planner
+    # generates 14-16 diverse search terms.
+    max_signals = plan.target_company_count * 2 if mode == "explore" else 40
     signals = unique[:max_signals]
 
-    # Async RAG ingestion — non-blocking side effect
+    # RAG ingestion — synchronous so chat is available immediately after report
     report_id = make_report_id(state["query"])
     company_name = state["query"].strip()
 
-    def _ingest():
-        try:
-            store_research(report_id, company_name, signals)
-        except Exception as e:
-            logger.warning(f"RAG ingestion failed: {e}")
-
-    threading.Thread(target=_ingest, daemon=True).start()
+    try:
+        store_research(report_id, company_name, signals)
+    except Exception as e:
+        logger.warning("RAG ingestion failed for report_id=%s: %s", report_id, e)
 
     return {"raw_signals": signals, "report_id": report_id}

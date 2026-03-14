@@ -2,7 +2,7 @@
 from __future__ import annotations
 import logging
 from langchain_core.messages import SystemMessage, HumanMessage
-from backend.config import get_llm, invoke_structured
+from backend.config import get_llm, get_settings, invoke_structured
 from backend.models import SearchPlan
 
 logger = logging.getLogger(__name__)
@@ -53,7 +53,7 @@ Generate 14-16 search terms. Quality over quantity."""
 
 
 def plan_search(state: dict) -> dict:
-    llm = get_llm()
+    llm = get_llm(get_settings().extraction_model)
 
     query = state["query"]
     mode = state["mode"]

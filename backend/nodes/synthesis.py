@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from backend.utils import deduplicate_funding_rounds
 from pydantic import BaseModel, Field
 from langchain_core.messages import SystemMessage, HumanMessage
-from backend.config import get_llm, invoke_structured
+from backend.config import get_llm, get_settings, invoke_structured
 from backend.models import (
     CompanyProfile, ExploreReport, DeepDiveReport, DeepDiveSection,
     SectionProse, FundingRound, PersonEntry, NewsItem, CompetitorEntry,
@@ -121,7 +121,16 @@ Highlight notable board members' backgrounds, investor representation on the boa
 {_SECTION_FORMAT_RULES}""",
 }
 
-_METADATA_PROMPT = """Extract metadata and structured arrays from the company profile data.
+_METADATA_PROMPT = """Extract metadata and structured arrays for the TARGET COMPANY ONLY.
+
+You will receive structured profile data AND raw source snippets. Use BOTH to extract
+the most complete and accurate information possible. The raw snippets contain the original
+source text — use them to verify and enrich the structured data.
+
+CRITICAL SCOPING RULE: Only extract people, board members, advisors, and other entries that
+belong to the TARGET company (specified in "Company: ..." below). Do NOT include executives,
+board members, or employees of competitor companies, investors, or partner organizations.
+If a person's affiliation is unclear, omit them.
 
 METADATA:
 - company_name: string
@@ -134,13 +143,16 @@ METADATA:
 - operating_status: "Active" | "Acquired" | "Closed" | "IPO" (default "Active" if unclear)
 - total_funding: string (e.g. "$1.2B", "$50M") — total capital raised across all rounds
 
-STRUCTURED ARRAYS (extract directly from profile data):
+STRUCTURED ARRAYS (extract directly from profile data AND raw source snippets):
 - funding_rounds: [{date, stage, amount, investors: [string], lead_investor: string or null, pre_money_valuation: string or null, post_money_valuation: string or null, source_url}]
   IMPORTANT: Deduplicate funding rounds. If two rounds have the same amount and overlapping investors,
   keep only the one with the more specific date. Never list the same round twice.
   Include lead_investor separately from the investors list. Include valuations if mentioned.
 - people_entries: [{name, title, background, source_url, linkedin_url, prior_exits: [string], domain_expertise_years: int, notable_affiliations: [string]}]
-  IMPORTANT: Always include linkedin_url if found in sources. Search for "linkedin.com/in/" patterns.
+  IMPORTANT: Only include people who WORK AT the target company (founders, executives, employees).
+  Do NOT include investors, competitor executives, or people from other organizations.
+  Always include linkedin_url if found in sources. Search for "linkedin.com/in/" patterns.
+  Verify each person's title and background against the raw source snippets.
 - news_items: [{title, date, source_url, snippet, sentiment: "positive"|"neutral"|"negative"}]
   IMPORTANT: Sort by date descending (most recent first). Use ISO-like date format (YYYY-MM-DD or YYYY-MM).
 - competitor_entries: [{name, description, funding, funding_stage, differentiator, overlap, website, source_url}]
@@ -148,7 +160,10 @@ STRUCTURED ARRAYS (extract directly from profile data):
 - red_flag_entries: [{content, severity: "low"|"medium"|"high", confidence: 0.0-1.0, source_urls: [string]}]
 - risk_entries: [{category: "regulatory"|"market"|"technology"|"team"|"financial"|"competitive", content, severity, confidence, source_urls}]
 - board_members: [{name, role: "Chair"|"Member"|"Observer", organization, background, linkedin_url, source_url}]
+  IMPORTANT: Only include board members OF the target company. Investor partners who sit on the board
+  should be listed with their VC firm as "organization", but they must actually serve on THIS company's board.
 - advisors: [{name, expertise, organization, linkedin_url, source_url}]
+  IMPORTANT: Only include advisors TO the target company.
 - partnerships: [{partner_name, type: "strategic"|"customer"|"technology"|"distribution", description, date, source_url}]
 - key_customers: [{name, description, source_url}]
 - acquisitions: [{acquired_company, date, amount, rationale, source_url}]
@@ -233,8 +248,21 @@ def _merge_profiles_into_meta(meta: MetadataAndArrays, profiles: list[CompanyPro
 
     The LLM re-extraction sometimes drops basic info that the profiler already captured.
     This ensures trivial fields like founded year, headcount, and headquarters survive.
+    Only merges from profiles that match the target company name to avoid cross-contamination.
     """
+    target = company_name.strip().lower()
+    target_words = set(target.split())
     for p in profiles:
+        # Skip profiles that don't match the target company.
+        # Use both substring and word-overlap checks to handle variations
+        # like "Apple" vs "Apple Inc." or "Mistral AI" vs "Mistral AI SAS".
+        if p.name:
+            pname = p.name.strip().lower()
+            is_substring = target in pname or pname in target
+            pname_words = set(pname.split())
+            word_overlap = len(target_words & pname_words) / max(len(target_words), 1)
+            if not is_substring and word_overlap < 0.5:
+                continue
         # Basic metadata — fill only if LLM left it empty
         if not meta.founded and p.founding_year:
             month_part = f"{p.founding_month} " if getattr(p, "founding_month", None) else ""
@@ -267,6 +295,7 @@ def _merge_profiles_into_meta(meta: MetadataAndArrays, profiles: list[CompanyPro
                     title=person.get("title"),
                     background=person.get("background"),
                     linkedin_url=person.get("linkedin_url"),
+                    source_url=person.get("source_url"),
                 ))
                 existing_people.add(name.lower().strip())
 
@@ -283,6 +312,7 @@ def _merge_profiles_into_meta(meta: MetadataAndArrays, profiles: list[CompanyPro
                     differentiator=comp.get("differentiator"),
                     overlap=comp.get("overlap"),
                     website=comp.get("website"),
+                    source_url=comp.get("source_url"),
                 ))
                 existing_competitors.add(name.lower().strip())
 
@@ -297,6 +327,7 @@ def _merge_profiles_into_meta(meta: MetadataAndArrays, profiles: list[CompanyPro
                     organization=bm.get("organization"),
                     background=bm.get("background"),
                     linkedin_url=bm.get("linkedin_url"),
+                    source_url=bm.get("source_url"),
                 ))
                 existing_board.add(name.lower().strip())
 
@@ -310,6 +341,7 @@ def _merge_profiles_into_meta(meta: MetadataAndArrays, profiles: list[CompanyPro
                     expertise=adv.get("expertise"),
                     organization=adv.get("organization"),
                     linkedin_url=adv.get("linkedin_url"),
+                    source_url=adv.get("source_url"),
                 ))
                 existing_advisors.add(name.lower().strip())
 
@@ -323,6 +355,7 @@ def _merge_profiles_into_meta(meta: MetadataAndArrays, profiles: list[CompanyPro
                     type=part.get("type"),
                     description=part.get("description"),
                     date=part.get("date"),
+                    source_url=part.get("source_url"),
                 ))
                 existing_partnerships.add(name.lower().strip())
 
@@ -336,8 +369,21 @@ def _merge_profiles_into_meta(meta: MetadataAndArrays, profiles: list[CompanyPro
                     date=acq.get("date"),
                     amount=acq.get("amount"),
                     rationale=acq.get("rationale"),
+                    source_url=acq.get("source_url"),
                 ))
                 existing_acquisitions.add(name.lower().strip())
+
+        # Key customers — merge
+        existing_customers = {kc.name.lower().strip() for kc in meta.key_customers}
+        for cust in p.key_customers:
+            name = cust.get("name", "")
+            if name and name.lower().strip() not in existing_customers:
+                meta.key_customers.append(KeyCustomer(
+                    name=name,
+                    description=cust.get("description"),
+                    source_url=cust.get("source_url"),
+                ))
+                existing_customers.add(name.lower().strip())
 
         # Patents — merge
         existing_patents = {pt.title.lower().strip() for pt in meta.patents}
@@ -350,20 +396,29 @@ def _merge_profiles_into_meta(meta: MetadataAndArrays, profiles: list[CompanyPro
                     status=pat.get("status"),
                     domain=pat.get("domain"),
                     patent_number=pat.get("patent_number"),
+                    source_url=pat.get("source_url"),
                 ))
                 existing_patents.add(title.lower().strip())
 
 
-def _generate_section(llm, section_key: str, profiles_text: str, company_name: str) -> tuple[str, SectionProse]:
-    """Generate a single section's prose via LLM. Returns (section_key, SectionProse)."""
+def _generate_section(section_key: str, profiles_text: str, raw_snippets: str, company_name: str) -> tuple[str, SectionProse]:
+    """Generate a single section's prose via LLM. Returns (section_key, SectionProse).
+
+    Creates its own LLM instance per thread to avoid shared-state issues.
+    """
     prompt = _SECTION_PROMPTS.get(section_key, "")
     if not prompt:
         return section_key, SectionProse(content="No data available.", confidence=0.0)
 
+    context = f"Company: {company_name}\n\nStructured profile data:\n{profiles_text}"
+    if raw_snippets:
+        context += f"\n\nRaw source snippets:\n{raw_snippets}"
+
+    llm = get_llm()
     try:
         result = invoke_structured(llm, SectionProse, [
             SystemMessage(content=prompt),
-            HumanMessage(content=f"Company: {company_name}\n\nCollected data:\n{profiles_text}")
+            HumanMessage(content=context)
         ])
         return section_key, result
     except Exception as exc:
@@ -372,7 +427,9 @@ def _generate_section(llm, section_key: str, profiles_text: str, company_name: s
 
 
 def synthesize(state: dict) -> dict:
-    llm = get_llm()
+    settings = get_settings()
+    llm_extraction = get_llm(settings.extraction_model)
+    llm_prose = get_llm()  # default = prose/reasoning model
     mode = state["mode"]
     profiles = state["company_profiles"]
 
@@ -384,7 +441,7 @@ def synthesize(state: dict) -> dict:
 
     if mode == "explore":
         try:
-            report = invoke_structured(llm, ExploreReport, [
+            report = invoke_structured(llm_extraction, ExploreReport, [
                 SystemMessage(content=EXPLORE_SYSTEM),
                 HumanMessage(content=f"Query: {state['query']}\n\nCompany profiles:\n{profiles_text}")
             ])
@@ -396,17 +453,43 @@ def synthesize(state: dict) -> dict:
     # --- Deep-dive: parallel synthesis ---
     company_name = state["query"]
 
+    # Build raw snippets from searcher signals so LLMs have original source text.
+    raw_signals = state.get("raw_signals", [])
+
+    # Full snippets for metadata extraction (needs all data to extract arrays)
+    raw_snippets_full = "\n\n".join(
+        f"[{s.source}] {s.url}\n{s.snippet[:600]}"
+        for s in raw_signals[:40]
+    ) if raw_signals else ""
+
+    # Shorter snippets for per-section prose and investment score (supplementary context)
+    raw_snippets_short = "\n\n".join(
+        f"[{s.source}] {s.url}\n{s.snippet[:400]}"
+        for s in raw_signals[:30]
+    ) if raw_signals else ""
+
     # 1. Extract metadata + structured arrays (one LLM call)
+    meta_context = f"Company: {company_name}\n\nStructured profile data:\n{profiles_text}"
+    if raw_snippets_full:
+        meta_context += f"\n\nRaw source snippets:\n{raw_snippets_full}"
     try:
-        meta = invoke_structured(llm, MetadataAndArrays, [
+        meta = invoke_structured(llm_extraction, MetadataAndArrays, [
             SystemMessage(content=_METADATA_PROMPT),
-            HumanMessage(content=f"Company: {company_name}\n\nCollected data:\n{profiles_text}")
+            HumanMessage(content=meta_context)
         ])
     except Exception as exc:
         logger.error("Metadata extraction failed: %s", exc)
         meta = MetadataAndArrays(company_name=company_name)
 
     meta.funding_rounds = deduplicate_funding_rounds(meta.funding_rounds)
+
+    # Assign sequential citation IDs (LLM may return inconsistent IDs)
+    for i, cit in enumerate(meta.citations, 1):
+        cit.id = i
+
+    # Sort news by date descending (LLM is instructed to, but enforce it)
+    if meta.news_items:
+        meta.news_items.sort(key=lambda n: n.date or "0000-00-00", reverse=True)
 
     # 1b. Fill metadata gaps from already-structured profile fields.
     # The LLM re-extraction sometimes misses basic info that the profiler already captured.
@@ -422,12 +505,15 @@ def synthesize(state: dict) -> dict:
                 logo_url = f"https://logo.clearbit.com/{domain}"
             break
 
-    # 3. Compute investment score (parallel with sections)
+    # 3. Compute investment score (single call, can use full context)
+    score_context = f"Company: {company_name}\n\nStructured profile data:\n{profiles_text}"
+    if raw_snippets_full:
+        score_context += f"\n\nRaw source snippets:\n{raw_snippets_full}"
     investment_score = None
     try:
-        investment_score = invoke_structured(llm, InvestmentScore, [
+        investment_score = invoke_structured(llm_prose, InvestmentScore, [
             SystemMessage(content=_INVESTMENT_SCORE_PROMPT),
-            HumanMessage(content=f"Company: {company_name}\n\nCollected data:\n{profiles_text}")
+            HumanMessage(content=score_context)
         ])
     except Exception as exc:
         logger.warning("Investment score computation failed: %s", exc)
@@ -436,19 +522,23 @@ def synthesize(state: dict) -> dict:
     for p in profiles:
         if hasattr(p, 'employee_count_history') and p.employee_count_history:
             for pt in p.employee_count_history:
-                if isinstance(pt, dict):
-                    try:
+                try:
+                    if isinstance(pt, EmployeeCountPoint):
+                        meta.employee_count_history.append(pt)
+                    elif isinstance(pt, dict):
                         meta.employee_count_history.append(
                             EmployeeCountPoint(**pt)
                         )
-                    except Exception:
-                        pass
+                except Exception as exc:
+                    logger.debug("Skipping employee_count_history entry: %s", exc)
         if hasattr(p, 'revenue_estimate') and p.revenue_estimate and not meta.revenue_estimate:
-            if isinstance(p.revenue_estimate, dict):
-                try:
+            try:
+                if isinstance(p.revenue_estimate, RevenueEstimate):
+                    meta.revenue_estimate = p.revenue_estimate
+                elif isinstance(p.revenue_estimate, dict):
                     meta.revenue_estimate = RevenueEstimate(**p.revenue_estimate)
-                except Exception:
-                    pass
+            except Exception as exc:
+                logger.debug("Skipping revenue_estimate: %s", exc)
         if hasattr(p, 'operating_status') and p.operating_status and not meta.operating_status:
             meta.operating_status = p.operating_status
 
@@ -464,7 +554,7 @@ def synthesize(state: dict) -> dict:
 
     with ThreadPoolExecutor(max_workers=6) as pool:
         futures = {
-            pool.submit(_generate_section, llm, key, profiles_text, company_name): key
+            pool.submit(_generate_section, key, profiles_text, raw_snippets_short, company_name): key
             for key in section_keys
         }
         for future in as_completed(futures):
@@ -474,22 +564,25 @@ def synthesize(state: dict) -> dict:
                 section_results[key] = prose
             except Exception as exc:
                 logger.warning("Section %s failed: %s", key, exc)
-                section_results[key] = SectionProse(content="Data not available.", confidence=0.0)
+                section_results[key] = SectionProse(content="Data not available due to processing error.", confidence=0.0)
 
     # 4. Assemble DeepDiveReport
     def _to_section(key: str) -> DeepDiveSection:
-        prose = section_results.get(key, SectionProse(content="No data available.", confidence=0.0))
+        prose = section_results.get(key, SectionProse(content="", confidence=0.0))
         return DeepDiveSection(
             title=key.replace("_", " ").title(),
             confidence=prose.confidence,
-            content=prose.content,
+            content=prose.content if prose.content else "",
             source_urls=prose.source_urls,
             source_count=prose.source_count,
         )
 
     def _to_optional_section(key: str):
         prose = section_results.get(key)
-        if not prose or not prose.content or prose.content.strip().lower() in ("", "data not available.", "no data available.", "data not available due to processing error."):
+        if not prose or not prose.content:
+            return None
+        cleaned = prose.content.strip().lower()
+        if not cleaned or "data not available" in cleaned or "no data available" in cleaned or "processing error" in cleaned:
             return None
         return _to_section(key)
 
