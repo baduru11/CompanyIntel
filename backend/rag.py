@@ -342,15 +342,17 @@ def retrieve(
     query: str,
     report_id: str | None = None,
     scope: str = "current",
+    company_name: str | None = None,
     top_k: int = 10,
 ) -> dict[str, Any]:
     """Query ChromaDB and return relevant chunks.
 
     Args:
         query: The search query text.
-        report_id: The report to scope to (required if scope="report").
+        report_id: The report to scope to (required if scope="current").
         scope: "current" to search per-report collection, "all" to search
                the unified all_research collection.
+        company_name: Filter results to this company (used with scope="all").
         top_k: Maximum number of results to return.
 
     Returns:
@@ -375,9 +377,16 @@ def retrieve(
         # Don't request more than what's available
         actual_k = min(top_k, count)
 
+        # Filter by company_name in unified collection so "all research"
+        # returns results relevant to the current company, not all companies
+        where_filter = None
+        if scope == "all" and company_name:
+            where_filter = {"company_name": company_name}
+
         results = collection.query(
             query_texts=[query],
             n_results=actual_k,
+            where=where_filter,
         )
     except Exception as exc:
         logger.error("ChromaDB query failed: %s", exc)
