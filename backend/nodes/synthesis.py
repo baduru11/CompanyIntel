@@ -22,12 +22,24 @@ logger = logging.getLogger(__name__)
 
 EXPLORE_SYSTEM = """You are a competitive intelligence analyst selecting companies from search results.
 
+CRITICAL RULES (MUST follow):
+- NEVER attribute a parent company's funding to a product. Claude Code is NOT a $7B+ company —
+  it's a product of Anthropic. GitHub Copilot is NOT a $100M+ funded startup — it's a Microsoft product.
+  If a product doesn't have its OWN independent funding, leave funding_total EMPTY.
+- NEVER list the same company/product twice under different names. If "Cursor" and "Anysphere"
+  both appear, keep ONLY "Cursor" (the product name users know).
+
 COMPANY SELECTION RULES:
-1. PREFER companies from the AVAILABLE COMPANIES list — copy names character-for-character.
-2. If the list has fewer than 12 relevant companies, you MAY add well-known companies
-   from your knowledge that are clearly in this sector but missing from the search results.
-   For added companies, use their official name and fill in all fields you know.
-3. Target 12-15 companies total. Quality matters more than hitting the target.
+1. FIRST: List the most important, well-known companies/products in this sector FROM YOUR KNOWLEDGE.
+   You already know the major players — list them even if they don't appear in the search results.
+   The search results are often incomplete. Your knowledge is the primary source for DISCOVERY.
+2. THEN: Check the AVAILABLE COMPANIES list for additional relevant companies you missed.
+   Copy names character-for-character when matching.
+3. For each company, fill in ALL fields you know (funding, year, HQ, investors, website, description).
+   Use both search data AND your knowledge.
+4. Target 10-12 companies that CLEARLY belong. Do NOT pad — quality over quantity.
+5. Use the PRODUCT name users know, not the corporate/parent name
+   (e.g., "Cursor" not "Anysphere", "Devin" not "Cognition Labs", "GitHub Copilot" not "GitHub").
 
 SELECTION CRITERIA — for each company in the list, ask TWO questions:
 1. "Is this an actual company/startup (not a category, article, or generic term)?"
@@ -35,38 +47,49 @@ SELECTION CRITERIA — for each company in the list, ask TWO questions:
 Both must be YES. If either is NO or UNCLEAR → exclude it.
 
 RELEVANCE TEST — be strict about relevance:
-- A company that merely USES AI coding tools is NOT an AI coding assistant company
-- A GPU manufacturer (Nvidia, AMD) is NOT an AI coding assistant company
-- A general consulting/outsourcing company (Aloa, Accenture) is NOT in the sector
-- A company must BUILD/SELL a product in the sector, not just be tangentially related
+- A company must BUILD/SELL a product in the queried sector, not just be tangentially related
+- A company that merely USES tools in this sector does NOT belong
+- Infrastructure providers (cloud, GPU) do NOT belong unless they have a dedicated product in this sector
+- General consulting/outsourcing/services companies do NOT belong
+- Companies from adjacent but DIFFERENT sectors do NOT belong (e.g., AI writing tools ≠ AI coding assistants)
+- Code security/scanning/testing tools are a DIFFERENT sector from coding assistants unless they have AI code generation features
 
 STRICTLY EXCLUDE even if in the list:
 - Generic category terms that are NOT real companies (e.g. "AI Code Assistants", "Best Coding Tools 2024", "Top AI Startups")
 - Articles, listicles, blogs, review sites, publications, newsletters (e.g. Stackademic, G2, TechCrunch, Gartner)
 - VCs, accelerators, investment firms, consulting firms
+- AI models, APIs, or open-source projects that are NOT standalone companies/products (e.g., Codex, Qwen3, LLaMA, StarCoder are models, not companies)
 - General-purpose AI tools (ChatGPT, Gemini, Claude) unless they have a DEDICATED product in the sector
 - Big tech parent companies (Microsoft, Google, Amazon, Apple, Samsung) — but their standalone dedicated products/subsidiaries ARE allowed
 - Hobby projects or tools with no evidence of real users, funding, or team
-- Duplicates — if "JetBrains AI" and "JetBrains AI Assistant" both appear, keep only one (the shorter canonical name)
+- Duplicates — if two entries refer to the same product/company, keep only ONE — the product name users know.
+  Examples: keep "Cursor" not "Anysphere", keep "Devin" not "Cognition", keep "Cody" not "Sourcegraph",
+  keep "Windsurf" not "Codeium", keep "Ghostwriter" not "Replit" (unless Replit itself is the product)
 - If a name looks like a generic keyword phrase rather than a company name, EXCLUDE it
 
 RANK by: funded companies first (most funding → top), then most traction data, then others.
-TARGET: Select 12-15 companies. If you have fewer than 10 good candidates, include all of them.
-Do NOT pad the list with irrelevant entries to hit the target — quality over quantity.
+TARGET: Select 10-12 companies that CLEARLY belong. Fewer is better than padding with unknowns.
+Do NOT pad the list to hit a target — only include companies you're confident about.
+If you only have 6 good candidates, return 6. Quality always beats quantity.
 
 For each selected company, populate AS MANY FIELDS AS POSSIBLE:
 - name: copy EXACTLY from the AVAILABLE COMPANIES list (character-for-character)
 - sub_sector: specific niche within the sector — use CONSISTENT singular naming
 - description: 2-3 sentences about what the company does
-- funding_total: total funding raised (e.g. "$252M", "$3.4B") — use data from sources OR your knowledge
+- funding_total: total funding raised (e.g. "$252M", "$3.4B") — use data from sources OR your knowledge.
+  If a product is part of a larger company (e.g., Claude Code → Anthropic, GitHub Copilot → Microsoft),
+  do NOT list the parent's total funding as the product's funding. Leave funding_total empty if the
+  product doesn't have independent funding.
 - funding_stage: latest known stage (e.g. "Series D", "Series B")
 - founding_year: year founded (integer, e.g. 2022)
 - headquarters: city and state/country (e.g. "San Francisco, CA")
 - key_investors: list of major investors (e.g. ["Sequoia Capital", "a16z"])
 - website: company website URL if known
+- user_count: number of users/developers (e.g. "1.3M+ paid subscribers", "20M+ users", "500K+ developers")
+  This is CRITICAL — fill in user/developer counts from your knowledge for EVERY company where known.
 
-IMPORTANT: Fill in funding, founding year, headquarters, and key investors from your knowledge
-if the source data doesn't contain them. It's better to provide known data than leave fields empty.
+IMPORTANT: Fill in ALL fields from your knowledge — especially user_count, funding, founding year,
+headquarters, and key investors. It's better to provide known data than leave fields empty.
 The critic node will verify claims later.
 
 SUB-SECTOR RULES:
@@ -593,9 +616,8 @@ def _extract_from_snippets(company: ExploreCompany, signals: list) -> ExploreCom
                         company.website = f"https://{found_domain}"
                         break
 
-    # Fallback: use first non-news domain ONLY if it's not a blog/article site
-    if not company.website and candidate_websites:
-        company.website = candidate_websites[0]
+    # No fallback: if we couldn't match the company name to a domain,
+    # leave website empty. The verification step's LLM can fill it in.
 
     for sig in signals:
         text = sig.snippet or ""
@@ -791,57 +813,150 @@ def _quick_web_search(query: str, num: int = 5) -> list[dict]:
 
 
 def _verify_and_supplement_companies(companies: list[ExploreCompany], query: str, llm) -> list[ExploreCompany]:
-    """Use a live web search + LLM to verify the company list and add missing major players."""
-    # Step 1: Quick web search for the latest company list in this sector
-    verification_results = _quick_web_search(f"top {query} companies startups funded 2025 2026", num=8)
-    if not verification_results:
+    """Use multiple web searches + LLM to build a comprehensive, relevant company list.
+
+    This is the PRIMARY quality gate — it searches for curated company lists
+    in this sector, then uses the LLM to merge with existing data, remove
+    irrelevant entries, add missing major players, and deduplicate.
+    """
+    # Step 1: Multiple web searches — keep the FULL sector phrase to avoid noise
+    # Include list queries, competitor queries, and sub-niche queries
+    top_company = companies[0].name if companies else ""
+    search_queries = [
+        f"top {query} companies startups 2025 2026",
+        f"best {query} tools comparison ranked",
+        f"{query} competitors alternatives list",
+    ]
+    # Add competitor query using a well-known company in the list
+    if top_company and len(top_company) > 2:
+        search_queries.append(f"{top_company} competitors alternatives vs 2025")
+    all_snippets = []
+    for sq in search_queries:
+        results = _quick_web_search(sq, num=6)
+        for r in results:
+            snippet = r.get("snippet", "")
+            if snippet:
+                all_snippets.append(snippet)
+
+    if not all_snippets:
         return companies
 
-    verification_text = "\n".join(
-        f"- {r.get('snippet', '')}" for r in verification_results
-    )
-
+    verification_text = "\n".join(f"- {s}" for s in all_snippets)
     existing_names = [c.name for c in companies]
 
-    # Step 2: Ask LLM to identify missing major companies from the web results
+    # Step 2: LLM evaluates everything — adds missing, removes irrelevant, deduplicates
     try:
-        class MissingCompanies(BaseModel):
-            companies: list[ExploreCompany] = Field(default_factory=list)
+        class CompanyVerification(BaseModel):
+            missing_companies: list[ExploreCompany] = Field(
+                default_factory=list,
+                description="Companies to ADD — only ones you're HIGHLY confident belong"
+            )
+            irrelevant_names: list[str] = Field(
+                default_factory=list,
+                description="Names of existing companies to REMOVE"
+            )
+            duplicate_pairs: list[str] = Field(
+                default_factory=list,
+                description="Names to remove because they duplicate another entry "
+                            "(e.g., remove 'Anysphere' because 'Cursor' is already listed)"
+            )
 
-        result = invoke_structured(llm, MissingCompanies, [
+        result = invoke_structured(llm, CompanyVerification, [
             SystemMessage(content=(
-                "You are given a list of companies already identified for a sector, "
-                "and fresh web search results about that sector. "
-                "Identify ONLY companies that are MISSING from the existing list but clearly "
-                "belong in this sector based on the web results. "
-                "For each missing company, fill in: name, sub_sector, description, "
-                "funding_total, funding_stage, founding_year, headquarters, key_investors, website. "
-                "Use data from the web results. Only add companies you're confident about. "
-                "Return at most 5 missing companies."
+                f"You are building the definitive list of companies/products in a SPECIFIC sector.\n\n"
+                f"You have an EXISTING list and FRESH web search results about '{query}'.\n\n"
+                f"THREE tasks:\n\n"
+                f"1. MISSING (up to 8): Add companies/products that CLEARLY belong in '{query}'. "
+                f"ONLY add if you can describe what their product does in this sector. "
+                f"Think about sub-niches: AI code editors, AI code completion, AI code review, "
+                f"AI app builders, AI coding agents, AI test generation. Cover ALL sub-niches.\n"
+                f"Do NOT add:\n"
+                f"   - AI models or open-source projects (Codex, Qwen, LLaMA, StarCoder = models, not companies)\n"
+                f"   - Companies from OTHER AI sectors (legal AI, security AI, enterprise search, AGI research)\n"
+                f"   - CI/CD, DevOps, or infrastructure platforms unless they have a dedicated AI coding feature\n"
+                f"   - Companies you're unsure about — when in doubt, leave them out\n"
+                f"Use the PRODUCT name users know, not the parent company. "
+                f"Only list funding the product/startup INDEPENDENTLY raised — never parent company funding. "
+                f"Fill in: name, sub_sector, description, funding_total, funding_stage, founding_year, "
+                f"headquarters, key_investors, website, user_count (e.g. '1M+ developers').\n\n"
+                f"2. IRRELEVANT: Remove companies whose CORE product is NOT in '{query}':\n"
+                f"   - Wrong sector entirely (legal AI, security AI, enterprise search, etc.)\n"
+                f"   - Code security/scanning/testing tools (Snyk, Veracode) ≠ coding assistants\n"
+                f"   - CI/CD platforms (Harness, CircleCI) ≠ coding assistants\n"
+                f"   - Generic AI platforms or AI research labs without a shipped product in this sector\n"
+                f"   - Parent company when the specific product is a better entry\n"
+                f"   Be aggressive — remove anything that doesn't CLEARLY belong.\n\n"
+                f"3. DUPLICATES: Remove the less-known name when two entries are the same:\n"
+                f"   - Parent + product (Anysphere → keep Cursor)\n"
+                f"   - Rebrand (Codeium → keep Windsurf)\n"
+                f"   - Same product, different names"
             )),
             HumanMessage(content=(
                 f"Sector: {query}\n\n"
-                f"EXISTING companies (already in the list):\n{chr(10).join(f'  - {n}' for n in existing_names)}\n\n"
+                f"EXISTING companies:\n{chr(10).join(f'  - {n}' for n in existing_names)}\n\n"
                 f"FRESH WEB SEARCH RESULTS:\n{verification_text}\n\n"
-                f"Which important companies are MISSING from the existing list?"
+                f"Build the best possible list for '{query}'. Quality over quantity."
             ))
         ])
 
-        if result.companies:
-            for c in result.companies:
+        # Remove irrelevant + duplicates
+        to_remove = set()
+        if result.irrelevant_names:
+            to_remove.update(n.lower().strip() for n in result.irrelevant_names)
+        if result.duplicate_pairs:
+            to_remove.update(n.lower().strip() for n in result.duplicate_pairs)
+        if to_remove:
+            before = len(companies)
+            companies = [c for c in companies if c.name.lower().strip() not in to_remove]
+            removed = before - len(companies)
+            if removed:
+                logger.info("Removed %d companies (irrelevant/duplicate): %s", removed, to_remove)
+            existing_names = [c.name for c in companies]
+
+        # Add missing companies — only if the LLM provided a description
+        # (no description = the LLM isn't confident enough to explain what this company does)
+        if result.missing_companies:
+            added = 0
+            for c in result.missing_companies:
+                if added >= 8:
+                    break
+                # Skip if no description — LLM must be able to explain relevance
+                if not c.description or len(c.description.strip()) < 20:
+                    logger.debug("Skipping verification add %s — no description", c.name)
+                    continue
                 # Skip if already exists (fuzzy match)
-                if any(c.name.lower().strip() == n.lower().strip() for n in existing_names):
+                c_lower = c.name.lower().strip()
+                if any(c_lower == n.lower().strip() or c_lower in n.lower() or n.lower().strip() in c_lower
+                       for n in existing_names if len(n) > 3):
                     continue
                 _normalize_funding_str(c)
                 c.confidence = _compute_confidence(c)
                 companies.append(c)
                 existing_names.append(c.name)
-                logger.info("Added missing company from verification: %s", c.name)
+                added += 1
+                logger.info("Added missing company: %s (funding=%s)", c.name, c.funding_total)
 
     except Exception as exc:
         logger.warning("Company verification failed: %s", exc)
 
     return companies
+
+
+def _name_in_text(name: str, text: str) -> bool:
+    """Check if a company name (or any significant word from it) appears in text.
+
+    Lenient matching for names like 'Bolt.new', 'v0 by Vercel', etc.
+    """
+    text_lower = text.lower()
+    name_lower = name.lower().strip()
+    if name_lower in text_lower:
+        return True
+    # Check if any significant word (>2 chars) from the name appears
+    words = [w.replace(".", "") for w in name_lower.split() if len(w.replace(".", "")) > 2]
+    # Exclude generic words that would cause false matches
+    skip = {"the", "and", "for", "inc", "ltd", "llc", "corp", "company", "new"}
+    words = [w for w in words if w not in skip]
+    return any(w in text_lower for w in words)
 
 
 def _secondary_enrich(company: ExploreCompany) -> ExploreCompany:
@@ -870,7 +985,8 @@ def _secondary_enrich(company: ExploreCompany) -> ExploreCompany:
                     company.website = f"https://{domain}"
 
         # Extract FUNDING from search snippets (NOT valuations)
-        if not company.funding_total:
+        # Only from snippets that mention this company to avoid cross-contamination
+        if not company.funding_total and _name_in_text(company.name, text):
             # Patterns that specifically match FUNDING (not valuation)
             funding_patterns = [
                 r'(?:total\s+)?(?:funding|raised|capital)(?:\s+(?:of|to\s+date|total))?\s*[:=]?\s*\$\s*([\d,.]+)\s*([BMK])',
@@ -921,8 +1037,8 @@ def _secondary_enrich(company: ExploreCompany) -> ExploreCompany:
                 if 1990 <= yr <= 2026:
                     company.founding_year = yr
 
-        # Extract user/developer count
-        if not company.user_count:
+        # Extract user/developer count — only from snippets mentioning this company
+        if not company.user_count and _name_in_text(company.name, text):
             user_patterns = [
                 r'(\d[\d,.]*[MKB]?\+?)\s*(?:users?|developers?|customers?|subscribers?|MAU)',
                 r'(?:over|more than|~)\s*(\d[\d,.]*[MKB]?\+?)\s*(?:users?|developers?|customers?)',
@@ -969,13 +1085,103 @@ def _secondary_enrich_batch(companies: list[ExploreCompany]) -> list[ExploreComp
     return companies
 
 
+def _merge_company_data(target: ExploreCompany, source: ExploreCompany) -> None:
+    """Copy missing fields from source into target (target takes precedence)."""
+    if not target.funding_total and source.funding_total:
+        target.funding_total = source.funding_total
+        target.funding_numeric = source.funding_numeric
+    if not target.funding_stage and source.funding_stage:
+        target.funding_stage = source.funding_stage
+    if not target.website and source.website:
+        target.website = source.website
+    if not target.founding_year and source.founding_year:
+        target.founding_year = source.founding_year
+    if not target.headquarters and source.headquarters:
+        target.headquarters = source.headquarters
+    if not target.key_investors and source.key_investors:
+        target.key_investors = source.key_investors
+    if not target.description and source.description:
+        target.description = source.description
+    if not target.user_count and source.user_count:
+        target.user_count = source.user_count
+    if not target.app_store_rating and source.app_store_rating:
+        target.app_store_rating = source.app_store_rating
+    if not target.app_downloads and source.app_downloads:
+        target.app_downloads = source.app_downloads
+    if not target.app_store_reviews and source.app_store_reviews:
+        target.app_store_reviews = source.app_store_reviews
+    target.source_count = max(target.source_count or 0, source.source_count or 0)
+    existing = set(target.source_urls)
+    for url in source.source_urls:
+        if url not in existing:
+            target.source_urls.append(url)
+            existing.add(url)
+
+
+def _extract_domain(url: str | None) -> str:
+    """Extract base domain from URL for comparison."""
+    if not url:
+        return ""
+    m = re.match(r'https?://(?:www\.)?([^/]+)', url)
+    return m.group(1).lower() if m else ""
+
+
+def _deduplicate_companies(companies: list[ExploreCompany]) -> list[ExploreCompany]:
+    """Remove duplicate companies by name containment OR matching website domain."""
+    if len(companies) < 2:
+        return companies
+
+    to_remove: set[int] = set()
+    for i, a in enumerate(companies):
+        if i in to_remove:
+            continue
+        a_lower = a.name.lower().strip()
+        a_domain = _extract_domain(a.website)
+        for j in range(i + 1, len(companies)):
+            if j in to_remove:
+                continue
+            b = companies[j]
+            b_lower = b.name.lower().strip()
+
+            # Both names must be meaningful length
+            if len(a_lower) < 4 or len(b_lower) < 4:
+                continue
+
+            # Check: name containment, same website domain, or description mentions the other
+            is_name_dup = a_lower in b_lower or b_lower in a_lower
+            b_domain = _extract_domain(b.website)
+            is_domain_dup = a_domain and b_domain and a_domain == b_domain
+            # If one company's description mentions the other's name, they're likely the same
+            a_desc = (a.description or "").lower()
+            b_desc = (b.description or "").lower()
+            is_desc_dup = (a_lower in b_desc) or (b_lower in a_desc)
+            if not is_name_dup and not is_domain_dup and not is_desc_dup:
+                continue
+
+            # Keep the one with more data, merge from the other
+            a_score = (a.confidence or 0) + (0.5 if a.funding_total else 0)
+            b_score = (b.confidence or 0) + (0.5 if b.funding_total else 0)
+
+            if a_score >= b_score:
+                _merge_company_data(a, b)
+                to_remove.add(j)
+                logger.info("Dedup: merged '%s' into '%s'", b.name, a.name)
+            else:
+                _merge_company_data(b, a)
+                to_remove.add(i)
+                logger.info("Dedup: merged '%s' into '%s'", a.name, b.name)
+                break  # a is removed, stop checking
+
+    return [c for i, c in enumerate(companies) if i not in to_remove]
+
+
 def _normalize_funding_str(company: ExploreCompany) -> None:
     """Normalize funding_total to compact format: '$1 billion' → '$1B', '$100 million' → '$100M'."""
     ft = company.funding_total
     if not ft:
         return
     ft_lower = ft.lower().strip()
-    m = re.match(r'\$\s*([\d,.]+)\s*(billion|million|thousand)', ft_lower)
+    m = re.search(r'\$\s*([\d,.]+)\s*(billion|million|thousand)', ft_lower)
     if m:
         amount = m.group(1)
         unit_map = {"billion": "B", "million": "M", "thousand": "K"}
@@ -1094,44 +1300,50 @@ def _synthesize_explore(state: dict, profiles: list, profiles_text: str, llm) ->
     available_names = sorted({p.name for p in profiles if p.name and p.name.strip().lower() != "unknown"})
     names_list = "\n".join(f"  - {name}" for name in available_names)
 
+    # Build raw snippet context — these comparison articles contain the real company lists
+    raw_snippet_text = ""
+    if raw_signals:
+        seen_snippets = set()
+        snippets = []
+        for s in raw_signals[:30]:
+            snip = (s.snippet or "")[:400].strip()
+            if snip and snip not in seen_snippets:
+                seen_snippets.add(snip)
+                snippets.append(snip)
+        raw_snippet_text = "\n\n".join(snippets[:15])
+
     try:
-        # Step 1: LLM selects relevant companies and writes descriptions
+        # Step 1: LLM reads raw search snippets + profiled data to select companies.
+        # The raw snippets from comparison articles are the BEST source for discovering
+        # all companies in a sector ("Top 17 AI Coding Assistants: Copilot, Cursor, ...")
         report = invoke_structured(llm, ExploreReport, [
             SystemMessage(content=EXPLORE_SYSTEM),
             HumanMessage(content=(
                 f"Query: {query}\n\n"
-                f"AVAILABLE COMPANIES (select ONLY from this list):\n{names_list}\n\n"
-                f"Company profiles:\n{concise_profiles}"
+                f"RAW SEARCH RESULTS (read these carefully — they list companies in this sector):\n"
+                f"{raw_snippet_text}\n\n"
+                f"STRUCTURED PROFILES (enrichment data for companies found in search):\n"
+                f"{concise_profiles}"
             ))
         ])
 
-        # Step 1b: Validate companies — prefer matches from profiles, but allow
-        # LLM-known companies that have substantial data filled in
+        # Step 1b: Validate — match LLM-selected names to profiles where possible,
+        # but accept ALL companies the LLM selected (knowledge-first approach).
         available_lower = {n.lower() for n in available_names}
-        original_count = len(report.companies)
         validated = []
         for c in report.companies:
             cname = c.name.strip().lower()
-            # Exact match in available list
+            # Try to match to available profile name for data enrichment later
             if cname in available_lower:
                 validated.append(c)
                 continue
             # Fuzzy: check if name is contained in or contains an available name
-            matched = False
             for avail in available_lower:
                 if cname in avail or avail in cname:
                     c.name = next(n for n in available_names if n.lower() == avail)
-                    matched = True
                     break
-            if matched:
-                validated.append(c)
-            # Allow LLM-added companies if they have substantial data (funding or description)
-            elif c.funding_total or (c.description and len(c.description) > 50):
-                logger.info("Accepting LLM-known company not in search results: %s", c.name)
-                validated.append(c)
-            else:
-                logger.warning("Dropping low-data company from explore: %s", c.name)
-        dropped_count = original_count - len(validated)
+            # Accept ALL LLM-selected companies — the LLM's knowledge IS the discovery source
+            validated.append(c)
         report.companies = validated
 
         # Step 2: Code-driven enrichment — match each company to its profile
@@ -1182,9 +1394,9 @@ def _synthesize_explore(state: dict, profiles: list, profiles_text: str, llm) ->
             c.confidence = _compute_confidence(c)
             enriched.append(c)
 
-        # If hallucination filtering dropped companies and left too few, fill from profiles
+        # If too few companies enriched, fill from profiles
         enriched_names = {c.name.strip().lower() for c in enriched}
-        if dropped_count > 0 and len(enriched) < 5:
+        if len(enriched) < 5:
             for key, p in profile_map.items():
                 if key in enriched_names or key == "unknown":
                     continue
@@ -1212,30 +1424,47 @@ def _synthesize_explore(state: dict, profiles: list, profiles_text: str, llm) ->
                 if len(enriched) >= 15:
                     break
 
-        # Post-processing: filter out non-companies and irrelevant entries
+        # Post-processing: filter out non-companies (generic terms, article sites)
         enriched = [c for c in enriched if not _is_non_company(c.name, c.website)]
-        # Filter: if a company's sub_sector doesn't share any keywords with the query,
-        # and it has no funding data, it's likely off-topic noise
-        query_words = set(query.lower().split())
-        for c in enriched[:]:
-            sector_words = set((c.sub_sector or "").lower().split())
-            # Check if sub_sector overlaps with query at all
-            overlap = query_words & sector_words
-            if not overlap and not c.funding_total and (c.confidence or 0) < 0.5:
-                logger.info("Removing off-topic company %s (sub_sector=%s, no funding)", c.name, c.sub_sector)
-                enriched.remove(c)
+        # NOTE: Sector-relevance filtering is handled by the LLM verification step,
+        # not by keyword overlap. A company tagged "Developer Tool" IS relevant
+        # to "AI coding assistants" — don't remove it based on sub_sector wording.
+
+        # Deduplicate near-identical names (e.g., "GitHub" + "GitHub Copilot")
+        enriched = _deduplicate_companies(enriched)
+
+        # Verify against live web: add missing major companies AND remove irrelevant ones.
+        # Runs BEFORE secondary enrichment so newly added companies also get enriched.
+        enriched = _verify_and_supplement_companies(enriched, query, llm)
+        enriched = [c for c in enriched if not _is_non_company(c.name, c.website)]
+        # Run dedup again after verification (verification may have added duplicates)
+        enriched = _deduplicate_companies(enriched)
+
+        # Secondary enrichment: targeted web searches for companies missing key data.
+        # Now covers both original AND verification-added companies.
         enriched = _secondary_enrich_batch(enriched)
         # Re-filter after enrichment (wrong websites may now be detected)
         enriched = [c for c in enriched if not _is_non_company(c.name, c.website)]
 
-        # Verify against live web data and add missing major companies
-        enriched = _verify_and_supplement_companies(enriched, query, llm)
-        enriched = [c for c in enriched if not _is_non_company(c.name, c.website)]
+        # Clear funding that's obviously from a parent company.
+        # Generic check: if funding > $1B AND the company name doesn't match its website domain,
+        # the funding likely belongs to the parent company, not this product.
+        for c in enriched:
+            if c.funding_numeric and c.funding_numeric >= 1_000_000_000 and c.website:
+                domain = _extract_domain(c.website).replace("www.", "")
+                name_words = [w.lower().replace(".", "") for w in c.name.split() if len(w) > 2]
+                # Check if ANY significant word from the company name appears in the domain
+                name_in_domain = any(w in domain for w in name_words)
+                if not name_in_domain:
+                    logger.info("Clearing likely parent-company funding for %s ($%.0fB, domain=%s doesn't match name)",
+                                c.name, c.funding_numeric / 1e9, domain)
+                    c.funding_total = None
+                    c.funding_numeric = 0.0
 
         enriched = _normalize_sub_sectors(enriched)
         # Re-sort by funding (descending) then confidence
         enriched.sort(key=lambda c: (c.funding_numeric or 0, c.confidence or 0), reverse=True)
-        report.companies = enriched[:15]
+        report.companies = enriched[:12]
         # Update report sub_sectors to match normalized companies
         report.sub_sectors = list({c.sub_sector for c in report.companies if c.sub_sector and c.sub_sector != "Unknown"})
     except Exception as exc:
@@ -1268,7 +1497,7 @@ def _synthesize_explore(state: dict, profiles: list, profiles_text: str, llm) ->
             c.confidence = _compute_confidence(c)
             enriched.append(c)
         enriched.sort(key=lambda x: x.confidence, reverse=True)
-        enriched = enriched[:15]
+        enriched = enriched[:12]
         sub_sectors = list({c.sub_sector for c in enriched if c.sub_sector and c.sub_sector != "Unknown"})
         report = ExploreReport(
             query=query,

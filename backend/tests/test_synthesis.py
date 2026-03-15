@@ -8,6 +8,7 @@ from backend.models import (
     DeepDiveReport,
     DeepDiveSection,
     SectionProse,
+    InvestmentScore,
 )
 from backend.nodes.synthesis import MetadataAndArrays
 
@@ -115,7 +116,11 @@ class TestSynthesisExplore:
         mock_structured.invoke.return_value = expected_report
         mock_llm.with_structured_output.return_value = mock_structured
 
-        with patch("backend.nodes.synthesis.get_llm", return_value=mock_llm):
+        with (
+            patch("backend.nodes.synthesis.get_llm", return_value=mock_llm),
+            patch("backend.nodes.synthesis._quick_web_search", return_value=[]),
+            patch("backend.nodes.synthesis._secondary_enrich_batch", side_effect=lambda x: x),
+        ):
             result = synthesize({
                 "mode": "explore",
                 "query": "AI startups",
@@ -125,11 +130,11 @@ class TestSynthesisExplore:
         assert "report" in result
         assert isinstance(result["report"], ExploreReport)
         assert result["report"].query == "AI startups"
-        assert len(result["report"].companies) == 1
-        assert result["report"].companies[0].name == "Acme Corp"
-        # Verify LLM was called with ExploreReport schema
-        mock_llm.with_structured_output.assert_called_once_with(ExploreReport)
-        mock_structured.invoke.assert_called_once()
+        assert len(result["report"].companies) >= 1
+        assert any(c.name == "Acme Corp" for c in result["report"].companies)
+        # Verify LLM was called with ExploreReport schema (first call)
+        first_call = mock_llm.with_structured_output.call_args_list[0]
+        assert first_call[0][0] is ExploreReport
 
     def test_synthesis_explore_passes_profiles_in_prompt(self):
         """The user message sent to the LLM should contain the query and profiles."""
@@ -145,7 +150,11 @@ class TestSynthesisExplore:
         mock_structured.invoke.return_value = expected_report
         mock_llm.with_structured_output.return_value = mock_structured
 
-        with patch("backend.nodes.synthesis.get_llm", return_value=mock_llm):
+        with (
+            patch("backend.nodes.synthesis.get_llm", return_value=mock_llm),
+            patch("backend.nodes.synthesis._quick_web_search", return_value=[]),
+            patch("backend.nodes.synthesis._secondary_enrich_batch", side_effect=lambda x: x),
+        ):
             synthesize({
                 "mode": "explore",
                 "query": "AI startups",
@@ -166,6 +175,8 @@ class TestSynthesisDeepDive:
         """Side effect for invoke_structured that returns appropriate mock per schema."""
         if schema is MetadataAndArrays:
             return MetadataAndArrays(company_name="Acme Corp")
+        if schema is InvestmentScore:
+            return InvestmentScore(money=15, market=20, momentum=10, management=15, rationale="Test")
         if schema is SectionProse:
             # Extract section hint from the system message
             system_content = messages[0].content if messages else ""
@@ -282,6 +293,8 @@ class TestSynthesisDeepDive:
                     headcount="~50",
                     funding_stage="Series A",
                 )
+            if schema is InvestmentScore:
+                return InvestmentScore(money=15, market=20, momentum=10, management=15, rationale="Test")
             return SectionProse(content="Test content.", confidence=0.8)
 
         with (
@@ -308,11 +321,11 @@ class TestSynthesisAntiHallucination:
         """EXPLORE_SYSTEM prompt contains anti-hallucination instructions."""
         from backend.nodes.synthesis import EXPLORE_SYSTEM
 
-        assert "ONLY use company names from the AVAILABLE COMPANIES list" in EXPLORE_SYSTEM, (
-            "EXPLORE_SYSTEM is missing the available-companies-only instruction"
+        assert "AVAILABLE COMPANIES" in EXPLORE_SYSTEM, (
+            "EXPLORE_SYSTEM is missing the available-companies instruction"
         )
-        assert "Do NOT invent" in EXPLORE_SYSTEM, (
-            "EXPLORE_SYSTEM is missing the anti-hallucination instruction"
+        assert "Do NOT pad the list" in EXPLORE_SYSTEM, (
+            "EXPLORE_SYSTEM is missing the anti-padding instruction"
         )
 
     def test_synthesis_section_prompts_have_grounding_instructions(self):
@@ -344,15 +357,20 @@ class TestSynthesisAntiHallucination:
         mock_structured.invoke.return_value = expected_report
         mock_llm.with_structured_output.return_value = mock_structured
 
-        with patch("backend.nodes.synthesis.get_llm", return_value=mock_llm):
+        with (
+            patch("backend.nodes.synthesis.get_llm", return_value=mock_llm),
+            patch("backend.nodes.synthesis._quick_web_search", return_value=[]),
+            patch("backend.nodes.synthesis._secondary_enrich_batch", side_effect=lambda x: x),
+        ):
             synthesize({
                 "mode": "explore",
                 "query": "AI startups",
                 "company_profiles": profiles,
             })
 
-        call_args = mock_structured.invoke.call_args[0][0]
-        system_msg = call_args[0].content
+        # First invoke call is the explore selection
+        first_invoke = mock_structured.invoke.call_args_list[0][0][0]
+        system_msg = first_invoke[0].content
         assert system_msg == EXPLORE_SYSTEM
 
     def test_synthesis_deep_dive_uses_per_section_prompts(self):
@@ -366,6 +384,8 @@ class TestSynthesisAntiHallucination:
             invoke_calls.append((schema, messages))
             if schema is MetadataAndArrays:
                 return MetadataAndArrays(company_name="Acme Corp")
+            if schema is InvestmentScore:
+                return InvestmentScore(money=15, market=20, momentum=10, management=15, rationale="Test")
             return SectionProse(content="Test content.", confidence=0.8)
 
         with (
@@ -378,8 +398,8 @@ class TestSynthesisAntiHallucination:
                 "company_profiles": profiles,
             })
 
-        # Should have 1 metadata call + 12 section calls = 13 total
-        assert len(invoke_calls) == 13
+        # Should have 1 metadata + 1 investment score + 13 section calls = 15 total
+        assert len(invoke_calls) == 15
         # First call should be metadata extraction
         meta_call_schema, meta_call_messages = invoke_calls[0]
         assert meta_call_schema is MetadataAndArrays
@@ -387,8 +407,8 @@ class TestSynthesisAntiHallucination:
 
 
 class TestSynthesisErrorHandling:
-    def test_raises_descriptive_error_on_llm_failure(self):
-        """Synthesis should raise a clear error when LLM fails."""
+    def test_graceful_degradation_on_llm_failure(self):
+        """Synthesis should gracefully degrade to profile-based report when LLM fails."""
         from backend.nodes.synthesis import synthesize
 
         mock_llm = MagicMock()
@@ -396,8 +416,16 @@ class TestSynthesisErrorHandling:
         mock_structured.invoke.side_effect = Exception("API timeout")
         mock_llm.with_structured_output.return_value = mock_structured
 
-        profiles = [_make_profile("Acme Corp")]
+        profiles = [_make_profile("Acme Corp", description="Acme builds chips")]
 
-        with patch("backend.nodes.synthesis.get_llm", return_value=mock_llm):
-            with pytest.raises(RuntimeError, match="Synthesis failed"):
-                synthesize({"query": "AI chips", "mode": "explore", "company_profiles": profiles})
+        with (
+            patch("backend.nodes.synthesis.get_llm", return_value=mock_llm),
+            patch("backend.nodes.synthesis._quick_web_search", return_value=[]),
+            patch("backend.nodes.synthesis._secondary_enrich_batch", side_effect=lambda x: x),
+        ):
+            result = synthesize({"query": "AI chips", "mode": "explore", "company_profiles": profiles})
+
+        # Should return a fallback report built from profiles
+        assert "report" in result
+        assert isinstance(result["report"], ExploreReport)
+        assert result["report"].query == "AI chips"

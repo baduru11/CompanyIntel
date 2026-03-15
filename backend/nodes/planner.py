@@ -10,28 +10,42 @@ logger = logging.getLogger(__name__)
 EXPLORE_PROMPT = """You are a competitive intelligence research planner.
 Given a sector query, generate 14-16 search terms to discover 10-20 REAL companies/startups in this space.
 
+CRITICAL RULE: The FULL sector phrase from the query MUST appear in EVERY search term.
+Never decompose "AI coding assistants" into just "AI" or "coding" alone.
+A search term like "AI startups funding 2024" is WRONG because it drops the sector qualifier.
+Every term must keep the full sector phrase or a precise synonym.
+
 SEARCH TERM STRATEGY — include a mix of:
-1. COMPANY DISCOVERY (5-6 terms): Find specific COMPANY NAMES in the sector
-   - "[sector] startups companies list 2024 2025"
-   - "[sector] top companies funded startups"
-   - "[sector] startup landscape market map competitors"
-   - "[sector] alternatives competitors comparison"
-   - "best [sector] startups founded raised funding"
 
-2. FUNDING & FINANCIALS (3-4 terms): Find funding data for companies
-   - "[sector] startups funding raised series A B C 2024 2025"
-   - "[sector] companies raised million billion crunchbase"
-   - "[sector] startup valuations venture capital investors"
+1. COMPANY LIST DISCOVERY (4-5 terms): Target listicles and curated rankings
+   - "top [full sector phrase] companies 2025"
+   - "best [full sector phrase] tools comparison 2025"
+   - "[full sector phrase] startups to watch 2025 2026"
+   - "[full sector phrase] market map landscape competitors"
+   - "[full sector phrase] alternatives ranked"
 
-3. TRACTION & ADOPTION (3-4 terms): Distinguish real products from side projects
-   - For consumer/apps: app store ratings, downloads, user counts, MAU
-   - For SaaS/B2B: G2/Capterra reviews, customer logos, ARR, enterprise deployments
-   - For hardware/deep tech: production volume, design wins, partnerships, patents
-   - For marketplaces/platforms: GMV, transaction volume, seller/buyer count
+2. NAMED COMPETITOR QUERIES (2-3 terms): Use well-known companies in this sector to find all others
+   - "[well-known company in sector] alternatives competitors 2025"
+   - "[company A] vs [company B] vs [company C] comparison"
+   Think: what's the most famous product in this sector? Use it to find all competitors.
 
-4. COMPETITIVE LANDSCAPE (2-3 terms): Find comparison articles
-   - "[sector] comparison vs alternatives"
-   - "[sector] competitive landscape analysis"
+3. FUNDING & FINANCIALS (3-4 terms): Find funding data for companies
+   - "[full sector phrase] startups funding raised 2024 2025"
+   - "[full sector phrase] companies raised million crunchbase"
+   - "[full sector phrase] startup valuations venture capital"
+
+4. TRACTION & ADOPTION (2-3 terms): Distinguish real products from side projects
+   - "[full sector phrase] users reviews downloads G2 Capterra"
+   - "[full sector phrase] enterprise adoption customers"
+
+5. COMPETITIVE LANDSCAPE (2-3 terms): Find comparison articles
+   - "[full sector phrase] competitive landscape analysis 2025"
+   - "[full sector phrase] comparison vs alternatives"
+
+DO NOT generate:
+- Generic terms that drop the sector qualifier (e.g., "AI startups" when query is "AI coding assistants")
+- Technology explanation queries ("how AI coding works")
+- News/trend queries that return articles about the technology, not about companies
 
 Include sub-sector categories to organize the landscape.
 Generate 14-16 search terms total. Focus on finding FUNDED companies with REAL products."""
