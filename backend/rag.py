@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 _chroma_client = None
 _embed_fn = None
 
-CHROMA_DIR = str(Path("cache") / "chromadb")
+CHROMA_DIR = str(Path(__file__).resolve().parent.parent / "cache" / "chromadb")
 UNIFIED_COLLECTION = "all_research"
 DISTANCE_THRESHOLD = 0.7  # cosine distance above which results are "weak" (0-2 range)
 MIN_GOOD_RESULTS = 3
@@ -182,7 +182,10 @@ def _upsert_chunks(
     if not chunks:
         return
 
-    ids = [f"{id_prefix}_{i}" for i in range(len(chunks))]
+    # Sanitize id_prefix: ChromaDB IDs must not contain characters that
+    # could trip up SQLite on Windows (e.g. colons, backslashes, etc.).
+    safe_prefix = re.sub(r"[^a-zA-Z0-9_-]", "_", id_prefix)
+    ids = [f"{safe_prefix}_{i}" for i in range(len(chunks))]
 
     # ChromaDB has a batch limit; upsert in batches of 500
     batch_size = 500

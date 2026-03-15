@@ -276,11 +276,14 @@ async def generate_chat_response(req: ChatRequest) -> AsyncGenerator[dict, None]
                         "content": result_text,
                     })
 
-                    # Store web results in RAG for future queries
+                    # Store web results in RAG for future queries (non-critical)
                     if web_results:
-                        await asyncio.to_thread(
-                            store_web_results, req.report_id, req.company_name, web_results
-                        )
+                        try:
+                            await asyncio.to_thread(
+                                store_web_results, req.report_id, req.company_name, web_results
+                            )
+                        except Exception as store_exc:
+                            logger.warning("Failed to store web results in RAG: %s", store_exc)
 
         # 6. Stream the final response
         # Include tools param if we used tool calls (some models require it
