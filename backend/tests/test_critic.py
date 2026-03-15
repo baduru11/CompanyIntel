@@ -213,17 +213,17 @@ class TestCriticHappyPath:
         assert system_msg == CRITIC_SYSTEM
 
 
-class TestCriticNoRetry:
-    """Tests that the critic never requests a retry (pipeline is linear)."""
+class TestCriticRetryLogic:
+    """Tests for the critic's retry decision logic."""
 
-    def test_critic_forces_should_retry_false_even_when_llm_says_true(self):
-        """should_retry is always forced to False regardless of LLM output."""
+    def test_critic_recommends_retry_when_many_low_confidence_sections(self):
+        """should_retry is True when 3+ sections have confidence < 0.4."""
         from backend.nodes.critic import critique
 
         report = _make_deep_dive_report()
         raw_signals = _make_raw_signals()
 
-        # LLM identifies critical gaps and recommends retry
+        # LLM identifies critical gaps — many sections below 0.4
         gap_critic = CriticReport(
             overall_confidence=0.25,
             section_scores={
@@ -248,11 +248,8 @@ class TestCriticNoRetry:
                 "Product details missing from raw sources",
                 "Competitor data fabricated",
             ],
-            should_retry=True,
-            retry_queries=[
-                "Acme Corp funding rounds 2024",
-                "Acme Corp leadership team",
-            ],
+            should_retry=False,  # LLM output doesn't matter — critic evaluates itself
+            retry_queries=[],
         )
 
         mock_llm = MagicMock()
@@ -264,16 +261,52 @@ class TestCriticNoRetry:
             result = critique({
                 "report": report,
                 "raw_signals": raw_signals,
+                "query": "Acme Corp",
                 "company_profiles": [],
             })
 
-        # should_retry is always forced to False (linear pipeline)
-        assert result["critic_report"].should_retry is False
-        # Gaps and queries are preserved for informational purposes
+        # should_retry is True because 7 sections have confidence < 0.4
+        assert result["critic_report"].should_retry is True
+        # retry_queries should be populated with targeted search terms
+        assert len(result["critic_report"].retry_queries) > 0
+        # Gaps are preserved
         assert len(result["critic_report"].gaps) == 4
-        # No retry_count or retry_targets in result
-        assert "retry_count" not in result
-        assert "retry_targets" not in result
+
+    def test_critic_no_retry_when_sections_are_good(self):
+        """should_retry is False when section scores are healthy."""
+        from backend.nodes.critic import critique
+
+        report = _make_deep_dive_report()
+        raw_signals = _make_raw_signals()
+
+        good_critic = CriticReport(
+            overall_confidence=0.8,
+            section_scores={
+                "overview": 0.9,
+                "funding": 0.8,
+                "key_people": 0.7,
+                "product_technology": 0.85,
+                "recent_news": 0.6,
+                "competitors": 0.5,
+                "red_flags": 0.4,
+            },
+            gaps=[],
+            should_retry=False,
+        )
+
+        mock_llm = MagicMock()
+        mock_structured = MagicMock()
+        mock_structured.invoke.return_value = good_critic
+        mock_llm.with_structured_output.return_value = mock_structured
+
+        with patch("backend.nodes.critic.get_llm", return_value=mock_llm):
+            result = critique({
+                "report": report,
+                "raw_signals": raw_signals,
+                "query": "Acme Corp",
+            })
+
+        assert result["critic_report"].should_retry is False
 
 
 class TestCriticEdgeCases:
@@ -363,8 +396,8 @@ class TestCriticEdgeCases:
 
 
 class TestCriticErrorHandling:
-    def test_raises_descriptive_error_on_llm_failure(self):
-        """Critic should raise a clear error when LLM fails."""
+    def test_graceful_degradation_on_llm_failure(self):
+        """Critic should degrade gracefully when LLM fails, returning a default report."""
         from backend.nodes.critic import critique
 
         mock_llm = MagicMock()
@@ -375,8 +408,11 @@ class TestCriticErrorHandling:
         report = _make_deep_dive_report()
 
         with patch("backend.nodes.critic.get_llm", return_value=mock_llm):
-            with pytest.raises(RuntimeError, match="Critic failed"):
-                critique({"report": report})
+            result = critique({"report": report, "query": "Acme Corp"})
+
+        # Should return a fallback critic report, not raise
+        assert "critic_report" in result
+        assert result["critic_report"].overall_confidence == 0.0
 
 
 class TestCriticTargetedRetry:

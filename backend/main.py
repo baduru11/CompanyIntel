@@ -395,6 +395,24 @@ async def query(req: QueryRequest):
                     if node_name == "__start__":
                         continue
 
+                    # Handle retry_gate node — emit retry status to frontend
+                    if node_name == "retry_gate":
+                        status_events = output.get("status_events", []) if isinstance(output, dict) else []
+                        for evt in status_events:
+                            detail = evt.detail if hasattr(evt, "detail") else str(evt)
+                            yield ServerSentEvent(
+                                data=json.dumps({"node": "system", "status": "retrying", "detail": detail}),
+                                event="status",
+                            )
+                        # After retry_gate, planner runs next
+                        yield ServerSentEvent(
+                            data=json.dumps({"node": "planner", "status": "running", "detail": "Replanning search strategy..."}),
+                            event="status",
+                        )
+                        if isinstance(output, dict):
+                            final_state.update(output)
+                        continue
+
                     # Stream report sections BEFORE emitting "complete" for synthesis,
                     # so the frontend receives section data before it thinks synthesis is done.
                     if node_name == "synthesis" and isinstance(output, dict) and "report" in output:

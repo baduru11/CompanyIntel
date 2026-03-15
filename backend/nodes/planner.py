@@ -95,12 +95,38 @@ def plan_search(state: dict) -> dict:
 
     query = state["query"]
     mode = state["mode"]
+    search_iteration = state.get("search_iteration", 0)
     prompt = EXPLORE_PROMPT if mode == "explore" else DEEP_DIVE_PROMPT
+
+    # Build the user message — on retries, add context to generate different terms
+    user_content = f"Query: {query}"
+
+    if search_iteration > 0:
+        # Gather previous search terms to avoid duplicates
+        prev_plan = state.get("search_plan")
+        prev_terms = prev_plan.search_terms if prev_plan else []
+        prev_terms_str = ", ".join(f'"{t}"' for t in prev_terms) if prev_terms else "none"
+
+        # Gather retry hints from the critic
+        critic_report = state.get("critic_report")
+        retry_hints = ""
+        if critic_report and getattr(critic_report, "retry_queries", None):
+            hints_str = ", ".join(f'"{q}"' for q in critic_report.retry_queries)
+            retry_hints = f"\nHint queries targeting gaps: {hints_str}"
+
+        user_content += (
+            f"\n\nIMPORTANT: This is retry #{search_iteration}. "
+            f"Previous searches found insufficient data. "
+            f"Generate DIFFERENT, more specific search terms. "
+            f"Do NOT reuse these previous terms: {prev_terms_str}"
+            f"{retry_hints}"
+        )
+        logger.info("Planner retry #%d for query=%s", search_iteration, query)
 
     try:
         plan = invoke_structured(llm, SearchPlan, [
             SystemMessage(content=prompt),
-            HumanMessage(content=f"Query: {query}")
+            HumanMessage(content=user_content)
         ])
     except Exception as exc:
         logger.error("Planner LLM call failed for query=%s: %s", query, exc)

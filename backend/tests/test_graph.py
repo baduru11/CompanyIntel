@@ -119,8 +119,8 @@ class TestAgentState:
     def test_agent_state_has_required_keys(self):
         expected_keys = {
             "query", "mode", "search_plan", "raw_signals",
-            "company_profiles", "report", "critic_report",
-            "status_events",
+            "company_profiles", "report", "report_id", "critic_report",
+            "status_events", "search_iteration",
         }
         assert expected_keys == set(AgentState.__annotations__.keys())
 
