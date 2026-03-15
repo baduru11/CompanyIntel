@@ -282,14 +282,20 @@ async def generate_chat_response(req: ChatRequest) -> AsyncGenerator[dict, None]
                             store_web_results, req.report_id, req.company_name, web_results
                         )
 
-        # 6. Stream the final response (no tools — just answer)
-        stream = await client.chat.completions.create(
+        # 6. Stream the final response
+        # Include tools param if we used tool calls (some models require it
+        # to accept tool_call/tool messages in the conversation)
+        stream_kwargs = dict(
             model=model,
             messages=messages,
             stream=True,
             temperature=0.3,
             max_tokens=1500,
         )
+        if all_web_results:
+            stream_kwargs["tools"] = [_WEB_SEARCH_TOOL]
+            stream_kwargs["tool_choice"] = "none"  # don't call tools, just answer
+        stream = await client.chat.completions.create(**stream_kwargs)
 
         try:
             async for chunk in stream:
@@ -308,7 +314,7 @@ async def generate_chat_response(req: ChatRequest) -> AsyncGenerator[dict, None]
         # 7. Done
         yield {"type": "done"}
 
-    except Exception:
-        logger.exception("Error in chat generation")
-        yield {"type": "error", "message": "An error occurred while generating the response. Please try again."}
+    except Exception as exc:
+        logger.exception("Error in chat generation: %s", exc)
+        yield {"type": "error", "message": f"An error occurred: {str(exc)[:200]}"}
         yield {"type": "done"}
