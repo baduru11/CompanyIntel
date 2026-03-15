@@ -8,18 +8,33 @@ from backend.models import SearchPlan
 logger = logging.getLogger(__name__)
 
 EXPLORE_PROMPT = """You are a competitive intelligence research planner.
-Given a sector query, generate a search plan to discover 10-20 companies in this space.
-Output search terms that will find companies, their funding, and key details.
+Given a sector query, generate 14-16 search terms to discover 10-20 REAL companies/startups in this space.
+
+SEARCH TERM STRATEGY — include a mix of:
+1. COMPANY DISCOVERY (5-6 terms): Find specific COMPANY NAMES in the sector
+   - "[sector] startups companies list 2024 2025"
+   - "[sector] top companies funded startups"
+   - "[sector] startup landscape market map competitors"
+   - "[sector] alternatives competitors comparison"
+   - "best [sector] startups founded raised funding"
+
+2. FUNDING & FINANCIALS (3-4 terms): Find funding data for companies
+   - "[sector] startups funding raised series A B C 2024 2025"
+   - "[sector] companies raised million billion crunchbase"
+   - "[sector] startup valuations venture capital investors"
+
+3. TRACTION & ADOPTION (3-4 terms): Distinguish real products from side projects
+   - For consumer/apps: app store ratings, downloads, user counts, MAU
+   - For SaaS/B2B: G2/Capterra reviews, customer logos, ARR, enterprise deployments
+   - For hardware/deep tech: production volume, design wins, partnerships, patents
+   - For marketplaces/platforms: GMV, transaction volume, seller/buyer count
+
+4. COMPETITIVE LANDSCAPE (2-3 terms): Find comparison articles
+   - "[sector] comparison vs alternatives"
+   - "[sector] competitive landscape analysis"
+
 Include sub-sector categories to organize the landscape.
-
-Include search terms that find TRACTION & ADOPTION DATA — adapt to the sector:
-- For consumer/apps: app store ratings, downloads, user counts, MAU
-- For SaaS/B2B: G2/Capterra reviews, customer logos, ARR, enterprise deployments
-- For hardware/deep tech: production volume, design wins, partnerships, patents filed
-- For marketplaces/platforms: GMV, transaction volume, seller/buyer count
-- General: Product Hunt upvotes, press coverage, awards, growth metrics
-
-These traction signals help distinguish real products from side projects."""
+Generate 14-16 search terms total. Focus on finding FUNDED companies with REAL products."""
 
 DEEP_DIVE_PROMPT = """You are a competitive intelligence research planner for investor due diligence.
 Given a company name, generate 14-16 specific search terms to find comprehensive intelligence.
