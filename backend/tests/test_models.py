@@ -10,14 +10,15 @@ from backend.models import (
 )
 
 def test_company_profile_requires_source_for_funding():
-    """If funding_total is set, funding_source_url must exist."""
-    with pytest.raises(ValidationError):
-        CompanyProfile(
-            name="TestCo",
-            funding_total="$10M",
-            funding_source_url=None,
-            funding_confidence=0.8
-        )
+    """If funding_total is set without funding_source_url, confidence is zeroed."""
+    profile = CompanyProfile(
+        name="TestCo",
+        funding_total="$10M",
+        funding_source_url=None,
+        funding_confidence=0.8
+    )
+    # Model no longer raises — it clamps confidence to 0.0 when source is missing
+    assert profile.funding_confidence == 0.0
 
 def test_company_profile_allows_missing_funding():
     """If funding_total is None, no source needed."""
@@ -35,8 +36,9 @@ def test_company_profile_valid_with_source():
     assert profile.name == "TestCo"
 
 def test_confidence_score_bounded():
-    with pytest.raises(ValidationError):
-        CompanyProfile(name="TestCo", funding_confidence=1.5)
+    """Out-of-range confidence is clamped to [0.0, 1.0] instead of raising."""
+    profile = CompanyProfile(name="TestCo", funding_confidence=1.5)
+    assert profile.funding_confidence == 1.0
 
 def test_search_plan_structure():
     plan = SearchPlan(
@@ -106,8 +108,9 @@ def test_red_flag_full():
 
 
 def test_red_flag_confidence_bounded():
-    with pytest.raises(ValidationError):
-        RedFlag(content="Bad", confidence=1.5)
+    """Out-of-range confidence is clamped to [0.0, 1.0] instead of raising."""
+    flag = RedFlag(content="Bad", confidence=1.5)
+    assert flag.confidence == 1.0
 
 
 def test_deep_dive_report_metadata_defaults():

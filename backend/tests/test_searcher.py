@@ -65,7 +65,11 @@ def test_searcher_explore_uses_all_three_providers():
             serper_api_key="test-serper-key",
             cache_dir="cache",
         )
-        result = search({"search_plan": plan, "mode": "explore"})
+        with (
+            patch("backend.nodes.searcher.make_report_id", return_value="test-id"),
+            patch("backend.nodes.searcher.store_research"),
+        ):
+            result = search({"search_plan": plan, "mode": "explore", "query": "AI chips"})
 
     assert "raw_signals" in result
     assert len(result["raw_signals"]) == 3
@@ -122,7 +126,11 @@ def test_searcher_deep_dive_uses_all_three_providers():
             serper_api_key="test-serper-key",
             cache_dir="cache",
         )
-        result = search({"search_plan": plan, "mode": "deep_dive"})
+        with (
+            patch("backend.nodes.searcher.make_report_id", return_value="test-id"),
+            patch("backend.nodes.searcher.store_research"),
+        ):
+            result = search({"search_plan": plan, "mode": "deep_dive", "query": "NVIDIA"})
 
     assert "raw_signals" in result
     # Tavily called once per search term
@@ -182,7 +190,11 @@ def test_searcher_deduplicates_by_url():
             serper_api_key="test-serper-key",
             cache_dir="cache",
         )
-        result = search({"search_plan": plan, "mode": "explore"})
+        with (
+            patch("backend.nodes.searcher.make_report_id", return_value="test-id"),
+            patch("backend.nodes.searcher.store_research"),
+        ):
+            result = search({"search_plan": plan, "mode": "explore", "query": "AI chips"})
 
     urls = [s.url for s in result["raw_signals"]]
     assert len(urls) == len(set(urls)), "Duplicate URLs found in results"
@@ -229,7 +241,11 @@ def test_searcher_uses_cache():
             serper_api_key="test-serper-key",
             cache_dir="cache",
         )
-        result = search({"search_plan": plan, "mode": "deep_dive"})
+        with (
+            patch("backend.nodes.searcher.make_report_id", return_value="test-id"),
+            patch("backend.nodes.searcher.store_research"),
+        ):
+            result = search({"search_plan": plan, "mode": "deep_dive", "query": "cached query"})
 
     # Cache was hit, so actual search APIs should NOT have been called
     mock_exa.search.assert_not_called()
@@ -237,7 +253,8 @@ def test_searcher_uses_cache():
     mock_httpx.assert_not_called()
     # Deduplicated: all 3 providers return same URL, so only 1 result
     assert len(result["raw_signals"]) == 1
-    assert result["raw_signals"][0].company_name == "CachedCo"
+    # In deep_dive mode, company_name is normalized to the query
+    assert result["raw_signals"][0].company_name == "cached query"
 
 
 class TestSearcherTimeoutHandling:
@@ -262,7 +279,7 @@ class TestSearcherTimeoutHandling:
         mock_cache = MagicMock()
         mock_cache.get_api.return_value = None
 
-        result = _search_tavily(mock_tavily, "AI chips", mock_cache)
+        result = _search_tavily(mock_tavily, "AI chips", 10, mock_cache)
         assert result == []
 
     def test_serper_timeout_returns_empty(self):
@@ -304,4 +321,4 @@ class TestSearcherTimeoutHandling:
                 cache_dir="cache",
             )
             with pytest.raises(RuntimeError, match="no results found"):
-                search({"search_plan": plan, "mode": "explore"})
+                search({"search_plan": plan, "mode": "explore", "query": "test"})

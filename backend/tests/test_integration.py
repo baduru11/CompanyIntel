@@ -9,9 +9,16 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.main import app
+from backend.main import app, _rate_buckets
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _clear_rate_limits():
+    """Clear the in-memory rate-limit buckets before each test so that
+    tests don't accumulate POST counts and trigger 429 responses."""
+    _rate_buckets.clear()
 
 
 # ---------------------------------------------------------------------------
