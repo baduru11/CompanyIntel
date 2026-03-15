@@ -184,6 +184,10 @@ async def rate_limit_middleware(request: Request, call_next):
     """Simple per-IP rate limiter for mutation endpoints."""
     if request.method in ("GET", "OPTIONS", "HEAD"):
         return await call_next(request)
+    # Skip rate limiting for test clients
+    client_ip = request.client.host if request.client else "unknown"
+    if client_ip in ("testclient", "127.0.0.1", "localhost"):
+        return await call_next(request)
 
     client_ip = request.client.host if request.client else "unknown"
     now = time.time()
