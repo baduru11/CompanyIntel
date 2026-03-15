@@ -5,7 +5,6 @@ import re
 from typing import Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import httpx
 from backend.utils import deduplicate_funding_rounds
 from pydantic import BaseModel, Field
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -35,6 +34,7 @@ def _normalize_linkedin_url(url: str | None) -> str | None:
 EXPLORE_SYSTEM = """You are a competitive intelligence analyst selecting companies from search results.
 
 CRITICAL RULES (MUST follow):
+- You have real-time web search access. Use it to verify companies and find current data.
 - NEVER attribute a parent company's funding to a product. Claude Code is NOT a $7B+ company —
   it's a product of Anthropic. GitHub Copilot is NOT a $100M+ funded startup — it's a Microsoft product.
   If a product doesn't have its OWN independent funding, leave funding_total EMPTY.
@@ -218,6 +218,10 @@ Highlight notable board members' backgrounds, investor representation on the boa
 }
 
 _METADATA_PROMPT = """Extract metadata and structured arrays for the TARGET COMPANY ONLY.
+
+You have real-time web search access. Search the web to find ALL funding rounds, competitors,
+board members, news items. This is the ONLY extraction pass — there is no gap-fill step.
+Be thorough: extract every piece of data you can find.
 
 You will receive structured profile data AND raw source snippets. Use BOTH to extract
 the most complete and accurate information possible. The raw snippets contain the original
@@ -813,58 +817,27 @@ def _compute_confidence(c: ExploreCompany) -> float:
     return round(min(score, 1.0), 2)
 
 
-def _quick_web_search(query: str, num: int = 5) -> list[dict]:
-    """Fast web search via Serper for secondary enrichment."""
-    settings = get_settings()
-    if not settings.serper_api_key:
-        return []
-    try:
-        resp = httpx.post(
-            "https://google.serper.dev/search",
-            headers={"X-API-KEY": settings.serper_api_key},
-            json={"q": query, "num": num},
-            timeout=8,
-        )
-        resp.raise_for_status()
-        return [
-            {"url": r.get("link", ""), "snippet": f"{r.get('title', '')}. {r.get('snippet', '')}"}
-            for r in resp.json().get("organic", [])[:num]
-        ]
-    except Exception as exc:
-        logger.debug("Quick search failed for '%s': %s", query, exc)
-        return []
 
 
-def _verify_and_supplement_companies(companies: list[ExploreCompany], query: str, llm) -> list[ExploreCompany]:
-    """Use multiple web searches + LLM to build a comprehensive, relevant company list.
+def _verify_and_supplement_companies(companies: list[ExploreCompany], query: str, llm, raw_signals=None) -> list[ExploreCompany]:
+    """Use LLM (with :online web search grounding) to build a comprehensive, relevant company list.
 
-    This is the PRIMARY quality gate — it searches for curated company lists
-    in this sector, then uses the LLM to merge with existing data, remove
-    irrelevant entries, add missing major players, and deduplicate.
+    This is the PRIMARY quality gate — the LLM uses its built-in web search to
+    verify companies, remove irrelevant entries, add missing major players, and deduplicate.
+    Raw signals from the search phase are provided as additional context.
     """
-    # Step 1: Multiple web searches — keep the FULL sector phrase to avoid noise
-    # Include list queries, competitor queries, and sub-niche queries
-    top_company = companies[0].name if companies else ""
-    search_queries = [
-        f"top {query} companies startups 2025 2026",
-        f"best {query} tools comparison ranked",
-        f"{query} competitors alternatives list",
-    ]
-    # Add competitor query using a well-known company in the list
-    if top_company and len(top_company) > 2:
-        search_queries.append(f"{top_company} competitors alternatives vs 2025")
+    # Build verification context from raw signals (already collected during search phase).
+    # The LLM has :online web search access and can search for additional data itself.
     all_snippets = []
-    for sq in search_queries:
-        results = _quick_web_search(sq, num=6)
-        for r in results:
-            snippet = r.get("snippet", "")
-            if snippet:
+    if raw_signals:
+        seen = set()
+        for s in raw_signals[:30]:
+            snippet = (s.snippet or "")[:400].strip()
+            if snippet and snippet not in seen:
+                seen.add(snippet)
                 all_snippets.append(snippet)
 
-    if not all_snippets:
-        return companies
-
-    verification_text = "\n".join(f"- {s}" for s in all_snippets)
+    verification_text = "\n".join(f"- {s}" for s in all_snippets) if all_snippets else "(No raw snippets — use your web search to verify.)"
     existing_names = [c.name for c in companies]
 
     # Step 2: LLM evaluates everything — adds missing, removes irrelevant, deduplicates
@@ -965,147 +938,10 @@ def _verify_and_supplement_companies(companies: list[ExploreCompany], query: str
     return companies
 
 
-def _name_in_text(name: str, text: str) -> bool:
-    """Check if a company name (or any significant word from it) appears in text.
-
-    Lenient matching for names like 'Bolt.new', 'v0 by Vercel', etc.
-    """
-    text_lower = text.lower()
-    name_lower = name.lower().strip()
-    if name_lower in text_lower:
-        return True
-    # Check if any significant word (>2 chars) from the name appears
-    words = [w.replace(".", "") for w in name_lower.split() if len(w.replace(".", "")) > 2]
-    # Exclude generic words that would cause false matches
-    skip = {"the", "and", "for", "inc", "ltd", "llc", "corp", "company", "new"}
-    words = [w for w in words if w not in skip]
-    return any(w in text_lower for w in words)
 
 
-def _secondary_enrich(company: ExploreCompany) -> ExploreCompany:
-    """Targeted search to fill missing funding/website/founding/traction data for a single company."""
-    needs_data = (not company.funding_total or not company.website
-                  or not company.founding_year or not company.user_count)
-    if not needs_data:
-        return company
-
-    results = _quick_web_search(f"{company.name} company funding raised founded users crunchbase", num=5)
-    if not results:
-        return company
-
-    for r in results:
-        text = r.get("snippet", "")
-        url = r.get("url", "")
-
-        # Extract website from search result URLs
-        if not company.website and url:
-            parts = url.split("/")
-            domain = parts[2] if len(parts) > 2 else ""
-            if domain and not any(sk in domain for sk in _SKIP_DOMAINS):
-                domain_clean = domain.lower().replace("www.", "").replace("-", "").replace(".", "")
-                name_parts = company.name.lower().replace(".", "").replace(" ", "")
-                if name_parts in domain_clean or (len(name_parts) > 3 and domain_clean.startswith(name_parts[:4])):
-                    company.website = f"https://{domain}"
-
-        # Extract FUNDING from search snippets (NOT valuations)
-        # Only from snippets that mention this company to avoid cross-contamination
-        if not company.funding_total and _name_in_text(company.name, text):
-            # Patterns that specifically match FUNDING (not valuation)
-            funding_patterns = [
-                r'(?:total\s+)?(?:funding|raised|capital)(?:\s+(?:of|to\s+date|total))?\s*[:=]?\s*\$\s*([\d,.]+)\s*([BMK])',
-                r'(?:raised|secured|closed|received)\s+\$\s*([\d,.]+)\s*([BMK])',
-                r'\$\s*([\d,.]+)\s*([BMK])\s*(?:in\s+)?(?:funding|raised|investment|round|series|seed)',
-            ]
-            # Pattern to DETECT valuations (so we can skip them)
-            valuation_pattern = r'(?:valued?\s+at|valuation\s+(?:of)?|worth)\s+\$\s*([\d,.]+)\s*([BMK])'
-
-            best_amount = 0.0
-            best_str = ""
-            for pattern in funding_patterns:
-                for fm in re.finditer(pattern, text, re.IGNORECASE):
-                    # Check if this match is actually a valuation in context
-                    start = max(0, fm.start() - 30)
-                    context = text[start:fm.end() + 10].lower()
-                    if 'valuat' in context or 'valued at' in context or 'worth' in context:
-                        continue  # Skip valuations
-                    amount = fm.group(1).replace(",", "")
-                    unit_raw = fm.group(2).strip().upper()
-                    if unit_raw.startswith("BILLION"):
-                        unit = "B"
-                    elif unit_raw.startswith("MILLION"):
-                        unit = "M"
-                    else:
-                        unit = unit_raw[0]
-                    candidate = f"${amount}{unit}"
-                    candidate_val = _parse_funding_numeric(candidate)
-                    if candidate_val > best_amount:
-                        best_amount = candidate_val
-                        best_str = candidate
-            if best_str:
-                if best_amount > (company.funding_numeric or 0):
-                    company.funding_total = best_str
-                    company.funding_numeric = best_amount
-
-        # Extract funding stage
-        if not company.funding_stage:
-            m = re.search(r'((?:Pre-)?Seed|Series\s+[A-Z]\+?|Angel)\s*(?:round|funding|stage)?', text, re.IGNORECASE)
-            if m:
-                company.funding_stage = m.group(1).strip()
-
-        # Extract founding year
-        if not company.founding_year:
-            m = re.search(r'(?:founded|established|launched|started)\s+(?:in\s+)?(\d{4})', text, re.IGNORECASE)
-            if m:
-                yr = int(m.group(1))
-                if 1990 <= yr <= 2026:
-                    company.founding_year = yr
-
-        # Extract user/developer count — only from snippets mentioning this company
-        if not company.user_count and _name_in_text(company.name, text):
-            user_patterns = [
-                r'(\d[\d,.]*[MKB]?\+?)\s*(?:users?|developers?|customers?|subscribers?|MAU)',
-                r'(?:over|more than|~)\s*(\d[\d,.]*[MKB]?\+?)\s*(?:users?|developers?|customers?)',
-            ]
-            for pattern in user_patterns:
-                m = re.search(pattern, text, re.IGNORECASE)
-                if m:
-                    count = m.group(1)
-                    # Skip tiny numbers
-                    try:
-                        raw = float(re.sub(r'[MKB+,]', '', count))
-                        if raw < 100 and not re.search(r'[MKB]', count, re.IGNORECASE):
-                            continue
-                    except ValueError:
-                        pass
-                    company.user_count = count + " users"
-                    break
-
-    return company
 
 
-def _secondary_enrich_batch(companies: list[ExploreCompany]) -> list[ExploreCompany]:
-    """Run secondary enrichment for companies missing key data, in parallel."""
-    needs_enrichment = [c for c in companies
-                        if not c.funding_total or not c.website
-                        or not c.founding_year or not c.user_count]
-    if not needs_enrichment:
-        return companies
-
-    logger.info("Secondary enrichment: %d/%d companies need data", len(needs_enrichment), len(companies))
-
-    with ThreadPoolExecutor(max_workers=5) as pool:
-        futures = {pool.submit(_secondary_enrich, c): c for c in needs_enrichment[:12]}
-        for future in as_completed(futures, timeout=30):
-            try:
-                future.result(timeout=10)
-            except Exception as exc:
-                logger.debug("Secondary enrichment failed: %s", exc)
-
-    # Recompute confidence after enrichment
-    for c in companies:
-        c.confidence = _compute_confidence(c)
-
-    return companies
 
 
 def _merge_company_data(target: ExploreCompany, source: ExploreCompany) -> None:
@@ -1456,18 +1292,15 @@ def _synthesize_explore(state: dict, profiles: list, profiles_text: str, llm) ->
         # Deduplicate near-identical names (e.g., "GitHub" + "GitHub Copilot")
         enriched = _deduplicate_companies(enriched)
 
-        # Verify against live web: add missing major companies AND remove irrelevant ones.
-        # Runs BEFORE secondary enrichment so newly added companies also get enriched.
-        enriched = _verify_and_supplement_companies(enriched, query, llm)
+        # Verify via LLM (with :online web search): add missing major companies AND remove irrelevant ones.
+        enriched = _verify_and_supplement_companies(enriched, query, llm, raw_signals=raw_signals)
         enriched = [c for c in enriched if not _is_non_company(c.name, c.website)]
         # Run dedup again after verification (verification may have added duplicates)
         enriched = _deduplicate_companies(enriched)
 
-        # Secondary enrichment: targeted web searches for companies missing key data.
-        # Now covers both original AND verification-added companies.
-        enriched = _secondary_enrich_batch(enriched)
-        # Re-filter after enrichment (wrong websites may now be detected)
-        enriched = [c for c in enriched if not _is_non_company(c.name, c.website)]
+        # Secondary enrichment removed: the :online extraction model already has
+        # real-time web search grounding during profiling, so separate Serper-based
+        # enrichment is redundant and adds latency without meaningful data gains.
 
         # Clear funding that's obviously from a parent company.
         # Generic check: if funding > $1B AND the company name doesn't match its website domain,
@@ -1624,65 +1457,9 @@ def synthesize(state: dict) -> dict:
         if removed:
             logger.info("Filtered %d people without valid titles", removed)
 
-    # 1d. Gap-fill: if structured arrays are thin, do a targeted LLM call to supplement
-    gaps = []
-    if len(meta.funding_rounds) < 2:
-        gaps.append("funding_rounds (include ALL known rounds: Seed, Series A, B, C, D etc.)")
-    if len(meta.competitor_entries) < 5:
-        gaps.append("competitor_entries (include 5-8 major competitors with funding amounts)")
-    if len(meta.news_items) < 3:
-        gaps.append("news_items (include 5+ recent news items)")
-    if len(meta.board_members) < 1:
-        gaps.append("board_members (include investor board seats if known)")
-    if len(meta.citations) < 5:
-        gaps.append("citations (include source URLs for factual claims)")
-
-    if gaps:
-        logger.info("Gap-filling %d thin arrays for %s: %s", len(gaps), company_name, [g.split(" (")[0] for g in gaps])
-        gap_prompt = (
-            f"The following structured arrays for {company_name} are incomplete. "
-            f"Fill them from your knowledge. Return ONLY the requested arrays.\n\n"
-            f"Include ALL funding rounds — Seed through latest. Do not skip earlier rounds.\n"
-            f"Do NOT fill linkedin_url or crunchbase_url — leave them null.\n\n"
-            f"Thin arrays to fill:\n" + "\n".join(f"- {g}" for g in gaps)
-        )
-        try:
-            gap_fill = invoke_structured(llm_extraction, MetadataAndArrays, [
-                SystemMessage(content=gap_prompt),
-                HumanMessage(content=f"Company: {company_name}\n\nExisting data:\n{profiles_text[:3000]}")
-            ])
-            # Merge gap-filled data (only add, never overwrite)
-            if len(meta.funding_rounds) < 2 and gap_fill.funding_rounds:
-                existing_stages = {(r.stage or "").lower() for r in meta.funding_rounds}
-                for r in gap_fill.funding_rounds:
-                    if (r.stage or "").lower() not in existing_stages:
-                        meta.funding_rounds.append(r)
-                meta.funding_rounds = deduplicate_funding_rounds(meta.funding_rounds)
-            if len(meta.competitor_entries) < 5 and gap_fill.competitor_entries:
-                existing_names = {c.name.lower() for c in meta.competitor_entries}
-                for c in gap_fill.competitor_entries:
-                    if c.name.lower() not in existing_names:
-                        meta.competitor_entries.append(c)
-            if len(meta.news_items) < 3 and gap_fill.news_items:
-                existing_titles = {n.title.lower() for n in meta.news_items}
-                for n in gap_fill.news_items:
-                    if n.title.lower() not in existing_titles:
-                        meta.news_items.append(n)
-                meta.news_items.sort(key=lambda n: n.date or "0000-00-00", reverse=True)
-            if len(meta.board_members) < 1 and gap_fill.board_members:
-                meta.board_members = gap_fill.board_members
-            if len(meta.citations) < 5 and gap_fill.citations:
-                existing_urls = {c.url for c in meta.citations}
-                for c in gap_fill.citations:
-                    if c.url not in existing_urls:
-                        meta.citations.append(c)
-                for i, cit in enumerate(meta.citations, 1):
-                    cit.id = i
-            logger.info("Gap-fill complete: rounds=%d, competitors=%d, news=%d, board=%d, citations=%d",
-                        len(meta.funding_rounds), len(meta.competitor_entries),
-                        len(meta.news_items), len(meta.board_members), len(meta.citations))
-        except Exception as exc:
-            logger.warning("Gap-fill failed: %s", exc)
+    # Gap-fill step removed: the :online extraction model has real-time web search
+    # grounding, so the initial metadata extraction call already produces comprehensive
+    # arrays. A separate gap-fill LLM call is redundant.
 
     # 2. Generate logo URL from company website
     logo_url = None

@@ -118,8 +118,6 @@ class TestSynthesisExplore:
 
         with (
             patch("backend.nodes.synthesis.get_llm", return_value=mock_llm),
-            patch("backend.nodes.synthesis._quick_web_search", return_value=[]),
-            patch("backend.nodes.synthesis._secondary_enrich_batch", side_effect=lambda x: x),
         ):
             result = synthesize({
                 "mode": "explore",
@@ -152,8 +150,6 @@ class TestSynthesisExplore:
 
         with (
             patch("backend.nodes.synthesis.get_llm", return_value=mock_llm),
-            patch("backend.nodes.synthesis._quick_web_search", return_value=[]),
-            patch("backend.nodes.synthesis._secondary_enrich_batch", side_effect=lambda x: x),
         ):
             synthesize({
                 "mode": "explore",
@@ -359,8 +355,6 @@ class TestSynthesisAntiHallucination:
 
         with (
             patch("backend.nodes.synthesis.get_llm", return_value=mock_llm),
-            patch("backend.nodes.synthesis._quick_web_search", return_value=[]),
-            patch("backend.nodes.synthesis._secondary_enrich_batch", side_effect=lambda x: x),
         ):
             synthesize({
                 "mode": "explore",
@@ -398,8 +392,9 @@ class TestSynthesisAntiHallucination:
                 "company_profiles": profiles,
             })
 
-        # Should have 1 metadata + 1 gap-fill + 1 investment score + 13 section calls = 16 total
-        assert len(invoke_calls) == 16
+        # Should have 1 metadata + 1 investment score + 13 section calls = 15 total
+        # (gap-fill step removed — :online model handles it in the initial extraction)
+        assert len(invoke_calls) == 15
         # First call should be metadata extraction
         meta_call_schema, meta_call_messages = invoke_calls[0]
         assert meta_call_schema is MetadataAndArrays
@@ -420,8 +415,6 @@ class TestSynthesisErrorHandling:
 
         with (
             patch("backend.nodes.synthesis.get_llm", return_value=mock_llm),
-            patch("backend.nodes.synthesis._quick_web_search", return_value=[]),
-            patch("backend.nodes.synthesis._secondary_enrich_batch", side_effect=lambda x: x),
         ):
             result = synthesize({"query": "AI chips", "mode": "explore", "company_profiles": profiles})
 

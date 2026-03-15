@@ -31,7 +31,7 @@ class Settings:
         self.openrouter_api_key: str = os.getenv("OPENROUTER_API_KEY", "")
         self.llm_provider: str = "openrouter"
         self.llm_model: str = os.getenv("LLM_MODEL", "deepseek/deepseek-v3.2")
-        self.chat_model: str = os.getenv("CHAT_MODEL", "deepseek/deepseek-chat")
+        self.chat_model: str = os.getenv("CHAT_MODEL", "google/gemini-3-flash-preview:online")
         self.extraction_model: str = os.getenv("EXTRACTION_MODEL", "google/gemini-3-flash-preview:online")
         self.diffbot_api_key: str = os.getenv("DIFFBOT_API_KEY", "")
         self.cache_dir: str = os.getenv("CACHE_DIR", "cache")

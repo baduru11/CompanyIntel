@@ -10,7 +10,10 @@ from backend.config import get_llm, get_settings, invoke_structured
 logger = logging.getLogger(__name__)
 
 EXTRACTION_PROMPT = """Extract structured company data from the provided sources.
-Only include information explicitly stated in the source text. Never guess or infer.
+You have real-time web search access. Use it to verify and supplement the extracted data —
+confirm funding amounts, find missing founding dates, check current headcounts, etc.
+
+Only include information explicitly stated in the source text or verified via web search. Never guess or infer.
 
 You MUST attempt to extract ALL of the following fields:
 
